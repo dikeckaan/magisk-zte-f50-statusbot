@@ -48,6 +48,9 @@ KOMUT_TIMEOUT=120   # seconds before auto-kill of /komut task
 KOMUT_MAX_OUTPUT=3500   # bytes of output to show
 
 mkdir -p "$TASK_DIR"
+# Record our PID so /lang and /restart_bot can self-restart without
+# nuking the supervisor via overly-broad pkill -f patterns.
+echo $$ > "$DATADIR/bot.pid"
 
 # ─── helpers ──────────────────────────────────────────────────────────────
 log() {
@@ -1063,7 +1066,7 @@ cmd_restart_bot() {
     echo "🔄 Bot yeniden başlatılıyor..."
     log "Bot restart requested via command"
     # Spawn detached killer so we can return reply first
-    ( sleep 2; pkill -f /data/adb/modules/statusbot/bot/bot.sh ) &
+    ( sleep 2; kill $(cat "$DATADIR/bot.pid" 2>/dev/null) ) &
 }
 
 # ─── quiet hours / heartbeat ──────────────────────────────────────────────
@@ -1673,7 +1676,7 @@ cmd_lang() {
     printf "%s\n" "$arg" > "$LANG_FILE_PREF"
     log "lang switched: $USER_LANG -> $arg"
     tf lang_set_fmt "$arg"
-    ( sleep 3; pkill -f "$MODDIR/bot/bot.sh" ) >/dev/null 2>&1 &
+    ( sleep 3; kill $(cat "$DATADIR/bot.pid" 2>/dev/null) ) >/dev/null 2>&1 &
 }
 
 # ─── /update — fetch latest module versions from GitHub updateJson ───────
@@ -1781,7 +1784,7 @@ Binary'ler değişti ise tam etki için reboot tavsiye edilir.
 statusbot kendisi güncellendiyse 10 sn içinde restart (supervisor)."
                 # If statusbot was updated, schedule self-restart
                 if grep -q "statusbot.*✅" /data/statusbot/bot.log.tmp 2>/dev/null; then
-                    ( sleep 3; pkill -f /data/adb/modules/statusbot/bot/bot.sh ) &
+                    ( sleep 3; kill $(cat "$DATADIR/bot.pid" 2>/dev/null) ) &
                 fi
             fi ;;
         *)
@@ -1825,7 +1828,7 @@ Liste için: /update"
                     cp /data/adb/modules_update/statusbot/bot/bot.sh /data/adb/modules/statusbot/bot/bot.sh
                     chmod 755 /data/adb/modules/statusbot/bot/bot.sh
                     echo "✅ statusbot $remote_ver kuruldu, bot 5 sn içinde restart..."
-                    ( sleep 5; pkill -f /data/adb/modules/statusbot/bot/bot.sh ) &
+                    ( sleep 5; kill $(cat "$DATADIR/bot.pid" 2>/dev/null) ) &
                 else
                     echo "✅ $cur_id $remote_ver kuruldu
 Binary değiştiyse reboot tavsiye edilir."
