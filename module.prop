@@ -1,7 +1,7 @@
 id=statusbot
 name=Telegram Status Bot
-version=v2.10.0
-versionCode=10
+version=v2.10.1
+versionCode=11
 author=kaandikec
 description=Telegram bot for rooted Android (ZTE F50). Multi-language UI (en default, tr + community). status/AT/shell/ZTE perf/IMEI/SMS/file/screenshot/wifi/ramclean/FS/network/power/app-mgmt/scheduling/heartbeat/quiet-hours/upload/tailscale/speedtest/update. Requires bin-utils (curl, jq, bash).
 updateJson=https://raw.githubusercontent.com/dikeckaan/magisk-zte-f50-statusbot/main/update.json
