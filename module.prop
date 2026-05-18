@@ -1,0 +1,7 @@
+id=statusbot
+name=Telegram Status Bot
+version=v2.9.0
+versionCode=9
+author=kaandikec
+description=Telegram bot for rooted Android: status/AT/shell/ZTE perf/IMEI/SMS/file/screenshot/wifi/ramclean/FS/network/power/app-mgmt/scheduling/heartbeat/quiet-hours/upload/tailscale-toggle. Requires bin-utils.
+updateJson=https://raw.githubusercontent.com/dikeckaan/magisk-zte-f50-statusbot/main/update.json
