@@ -165,6 +165,70 @@ Load guide:
   < %d.0 = headroom available
   > %d.0 = queue, slowdowns possible"
 
+    # ─── /quiet_hours ────────────────────────────────────────────────
+    [qh_active]="🔇 currently quiet"
+    [qh_inactive]="🔊 not active right now"
+    [qh_status_fmt]="Quiet hours: %s:00 — %s:00 (%s)"
+    [qh_not_set]="Quiet hours are not set.
+Usage: /quiet_hours <from> <to>
+Example: /quiet_hours 23 7  (silent from 23:00 to 07:00)"
+    [qh_off]="🔊 Quiet hours disabled"
+    [qh_invalid_from]="❌ Invalid 'from'"
+    [qh_invalid_to]="❌ Invalid 'to'"
+    [qh_range_from]="❌ from must be 0-23"
+    [qh_range_to]="❌ to must be 0-23"
+    [qh_set_fmt]="🔇 Quiet hours: %s:00 — %s:00 (automatic alerts are silent in this window)"
+
+    # ─── /heartbeat ──────────────────────────────────────────────────
+    [hb_status_fmt]="❤️ Heartbeat: every %d hours
+To disable: /heartbeat off"
+    [hb_not_set]="Heartbeat is off.
+Usage: /heartbeat <interval-hours>
+Example: /heartbeat 6  (an 'I'm alive' message every 6 hours)"
+    [hb_disabled]="❤️ Heartbeat disabled"
+    [hb_not_number]="❌ Must be an hour count (number)"
+    [hb_min_one]="❌ At least 1 hour"
+    [hb_set_fmt]="❤️ Heartbeat: every %d hour(s) enabled"
+    [hb_ping_fmt]="❤️ Heartbeat — %s, I'm up.
+Uptime: %s | Temp: %s"
+
+    # ─── /alarm ──────────────────────────────────────────────────────
+    [alarm_usage]="Usage: /alarm HH:MM <message>
+Example: /alarm 14:30 Meeting time"
+    [alarm_no_msg]="❌ Message missing"
+    [alarm_bad_hour]="❌ Hour?"
+    [alarm_bad_min]="❌ Minute?"
+    [alarm_bad_time]="❌ Invalid time"
+    [alarm_set_fmt]="⏰ Alarm: %s:%s (in %dh %02dm)
+message: %s"
+    [alarm_fired_fmt]="⏰ ALARM
+%s"
+
+    # ─── /schedule ───────────────────────────────────────────────────
+    [sch_empty]="No schedules.
+
+Usage:
+/alarm HH:MM <msg>
+/schedule <seconds> <cmd>     (recurring)
+/schedule clear               (wipe all)"
+    [sch_header]="📅 Schedules:"
+    [sch_now_label]="now"
+    [sch_sec_fmt]="%ds"
+    [sch_min_fmt]="%dm"
+    [sch_hour_fmt]="%dh %02dm"
+    [sch_entry_fmt]="  %d. [%s] %s — %s\n"
+    [sch_cleared]="🗑 All schedules cleared"
+    [sch_cancel_usage]="Usage: /schedule cancel <idx>"
+    [sch_cancelled_fmt]="✓ Deleted: %s"
+    [sch_invalid_usage]="Usage: /schedule <seconds> <cmd>"
+    [sch_no_cmd]="❌ Command missing"
+    [sch_min_secs]="❌ At least 10 seconds"
+    [sch_added_fmt]="🔁 Scheduled: every %d seconds → '%s'
+First in %d seconds"
+    [sch_fire_fmt]="🔁 Schedule [%s]
+%s"
+    [sch_unsupported_fmt]="(unsupported in schedule: %s)"
+
     # ─── /speedtest ──────────────────────────────────────────────────
     [st_usage]="Usage: /speedtest [PROVIDER] [SIZE] [loop [COUNT]]
 

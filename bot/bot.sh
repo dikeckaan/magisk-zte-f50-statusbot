@@ -1097,33 +1097,31 @@ cmd_quiet_hours() {
     local args="$1"
     if [ -z "$args" ] || [ "$args" = "status" ]; then
         if [ -f "$QUIET_FILE" ]; then
-            local from to
+            local from to state
             from=$(awk -F= '/^from=/{print $2}' "$QUIET_FILE")
             to=$(awk -F= '/^to=/{print $2}' "$QUIET_FILE")
-            local state="🔊 aktif değil"
-            is_quiet_hours && state="🔇 sessizdeyiz"
-            echo "Quiet hours: ${from}:00 — ${to}:00 ($state)"
+            state="${MSG[qh_inactive]}"
+            is_quiet_hours && state="${MSG[qh_active]}"
+            tf qh_status_fmt "$from" "$to" "$state"
         else
-            echo "Quiet hours tanımlı değil.
-Kullanım: /quiet_hours <from> <to>
-Örnek: /quiet_hours 23 7  (gece 23 → sabah 7 sessiz)"
+            echo "${MSG[qh_not_set]}"
         fi
         return
     fi
     if [ "$args" = "off" ] || [ "$args" = "kapat" ]; then
         rm -f "$QUIET_FILE"
-        echo "🔊 Quiet hours kapatıldı"
+        echo "${MSG[qh_off]}"
         return
     fi
     local from to
     from=$(echo "$args" | awk '{print $1}')
     to=$(echo "$args" | awk '{print $2}')
-    case "$from" in ''|*[!0-9]*) echo "❌ Geçersiz from"; return ;; esac
-    case "$to" in ''|*[!0-9]*) echo "❌ Geçersiz to"; return ;; esac
-    [ "$from" -lt 0 ] || [ "$from" -gt 23 ] && { echo "❌ from 0-23 olmalı"; return; }
-    [ "$to" -lt 0 ] || [ "$to" -gt 23 ] && { echo "❌ to 0-23 olmalı"; return; }
+    case "$from" in ''|*[!0-9]*) echo "${MSG[qh_invalid_from]}"; return ;; esac
+    case "$to" in ''|*[!0-9]*) echo "${MSG[qh_invalid_to]}"; return ;; esac
+    [ "$from" -lt 0 ] || [ "$from" -gt 23 ] && { echo "${MSG[qh_range_from]}"; return; }
+    [ "$to" -lt 0 ] || [ "$to" -gt 23 ] && { echo "${MSG[qh_range_to]}"; return; }
     { echo "from=$from"; echo "to=$to"; } > "$QUIET_FILE"
-    echo "🔇 Quiet hours: ${from}:00 — ${to}:00 (alarmlar bu saatlerde susar)"
+    tf qh_set_fmt "$from" "$to"
 }
 
 cmd_heartbeat() {
@@ -1132,26 +1130,23 @@ cmd_heartbeat() {
         if [ -f "$HEARTBEAT_CONF" ]; then
             local intv
             intv=$(awk -F= '/^interval=/{print $2}' "$HEARTBEAT_CONF")
-            echo "❤️ Heartbeat: her $((intv/3600)) saatte bir
-Kapatmak: /heartbeat off"
+            tf hb_status_fmt "$((intv/3600))"
         else
-            echo "Heartbeat kapalı.
-Kullanım: /heartbeat <interval-saat>
-Örnek: /heartbeat 6  (6 saatte bir 'ayaktayım' mesajı)"
+            echo "${MSG[hb_not_set]}"
         fi
         return
     fi
     if [ "$args" = "off" ] || [ "$args" = "kapat" ]; then
         rm -f "$HEARTBEAT_CONF" "$LAST_HEARTBEAT"
-        echo "❤️ Heartbeat kapatıldı"
+        echo "${MSG[hb_disabled]}"
         return
     fi
-    case "$args" in *[!0-9]*) echo "❌ Saat (rakam) olmalı"; return ;; esac
-    [ "$args" -lt 1 ] && { echo "❌ En az 1 saat"; return; }
+    case "$args" in *[!0-9]*) echo "${MSG[hb_not_number]}"; return ;; esac
+    [ "$args" -lt 1 ] && { echo "${MSG[hb_min_one]}"; return; }
     local secs=$((args * 3600))
     echo "interval=$secs" > "$HEARTBEAT_CONF"
     date +%s > "$LAST_HEARTBEAT"
-    echo "❤️ Heartbeat: her $args saatte bir aktive edildi"
+    tf hb_set_fmt "$args"
 }
 
 poll_heartbeat() {
@@ -1164,8 +1159,7 @@ poll_heartbeat() {
     now=$(date +%s)
     if [ $((now - last)) -ge "$intv" ]; then
         is_quiet_hours && return
-        tg_send "$OWNER" "❤️ Heartbeat — $(greeting), ayaktayım.
-Uptime: $(fmt_uptime) | Sıcaklık: $(fmt_temp)" >/dev/null
+        tg_send "$OWNER" "$(printf "${MSG[hb_ping_fmt]}" "$(greeting)" "$(fmt_uptime)" "$(fmt_temp)")" >/dev/null
         echo "$now" > "$LAST_HEARTBEAT"
         log "heartbeat sent"
     fi
@@ -1177,23 +1171,20 @@ SCHEDULES_FILE="$DATADIR/schedules.txt"
 cmd_alarm() {
     # /alarm HH:MM <message>   one-shot at next occurrence of HH:MM
     local args="$1"
-    [ -z "$args" ] && { echo "Kullanım: /alarm HH:MM <mesaj>
-Örnek: /alarm 14:30 Toplantı zamanı"; return; }
+    [ -z "$args" ] && { echo "${MSG[alarm_usage]}"; return; }
     local time_part
     time_part=$(echo "$args" | awk '{print $1}')
     local msg
     msg=$(echo "$args" | awk '{$1=""; sub(/^ /,""); print}')
-    [ -z "$msg" ] && { echo "❌ Mesaj eksik"; return; }
+    [ -z "$msg" ] && { echo "${MSG[alarm_no_msg]}"; return; }
     local h m
     h=$(echo "$time_part" | cut -d: -f1)
     m=$(echo "$time_part" | cut -d: -f2)
-    case "$h" in ''|*[!0-9]*) echo "❌ Saat?"; return ;; esac
-    case "$m" in ''|*[!0-9]*) echo "❌ Dakika?"; return ;; esac
-    # Decimal-safe (avoid octal mishaps on leading zeros)
+    case "$h" in ''|*[!0-9]*) echo "${MSG[alarm_bad_hour]}"; return ;; esac
+    case "$m" in ''|*[!0-9]*) echo "${MSG[alarm_bad_min]}"; return ;; esac
     h=$((10#$h)); m=$((10#$m))
-    [ "$h" -gt 23 ] || [ "$m" -gt 59 ] && { echo "❌ Geçersiz saat"; return; }
+    [ "$h" -gt 23 ] || [ "$m" -gt 59 ] && { echo "${MSG[alarm_bad_time]}"; return; }
 
-    # Compute next epoch for HH:MM portably (no date -d, toybox-safe)
     local now=$(date +%s)
     local cur_h cur_m cur_s
     cur_h=$(date +%H); cur_m=$(date +%M); cur_s=$(date +%S)
@@ -1208,8 +1199,7 @@ cmd_alarm() {
     mkdir -p "$(dirname "$SCHEDULES_FILE")"
     echo "$today_target|alarm|$msg" >> "$SCHEDULES_FILE"
     local diff=$((today_target - now))
-    echo "⏰ Alarm: $h:$m ($((diff/3600))sa $((diff%3600/60))dk sonra)
-mesaj: $msg"
+    tf alarm_set_fmt "$(printf "%02d" "$h")" "$(printf "%02d" "$m")" "$((diff/3600))" "$((diff%3600/60))" "$msg"
 }
 
 cmd_schedule() {
@@ -1222,53 +1212,47 @@ cmd_schedule() {
     case "$arg1" in
         ""|status|list)
             if [ ! -s "$SCHEDULES_FILE" ]; then
-                echo "Hiç zamanlama yok.
-
-Kullanım:
-/alarm HH:MM <mesaj>
-/schedule <saniye> <komut>    (tekrarlı)
-/schedule clear               (hepsini sil)"
+                echo "${MSG[sch_empty]}"
                 return
             fi
-            echo "📅 Zamanlamalar:"
+            echo "${MSG[sch_header]}"
             local i=0 now=$(date +%s)
             while IFS='|' read -r when type rest; do
                 i=$((i+1))
                 local in_sec=$((when - now))
                 local in_label
-                if [ "$in_sec" -lt 0 ]; then in_label="şimdi"
-                elif [ "$in_sec" -lt 60 ]; then in_label="${in_sec}sn"
-                elif [ "$in_sec" -lt 3600 ]; then in_label="$((in_sec/60))dk"
-                else in_label="$((in_sec/3600))sa $(((in_sec%3600)/60))dk"
+                if [ "$in_sec" -lt 0 ]; then in_label="${MSG[sch_now_label]}"
+                elif [ "$in_sec" -lt 60 ]; then in_label=$(printf "${MSG[sch_sec_fmt]}" "$in_sec")
+                elif [ "$in_sec" -lt 3600 ]; then in_label=$(printf "${MSG[sch_min_fmt]}" "$((in_sec/60))")
+                else in_label=$(printf "${MSG[sch_hour_fmt]}" "$((in_sec/3600))" "$(((in_sec%3600)/60))")
                 fi
-                printf "  %d. [%s] %s — %s\n" "$i" "$type" "$rest" "$in_label"
+                printf "${MSG[sch_entry_fmt]}" "$i" "$type" "$rest" "$in_label"
             done < "$SCHEDULES_FILE"
             return ;;
         clear)
-            rm -f "$SCHEDULES_FILE"; echo "🗑 Tüm zamanlamalar silindi"; return ;;
+            rm -f "$SCHEDULES_FILE"; echo "${MSG[sch_cleared]}"; return ;;
         cancel)
             local idx
             idx=$(echo "$1" | awk '{print $2}')
-            [ -z "$idx" ] && { echo "Kullanım: /schedule cancel <idx>"; return; }
+            [ -z "$idx" ] && { echo "${MSG[sch_cancel_usage]}"; return; }
             local tmp="${SCHEDULES_FILE}.tmp"
             awk -v drop="$idx" 'NR != drop' "$SCHEDULES_FILE" > "$tmp" && mv "$tmp" "$SCHEDULES_FILE"
-            echo "✓ Silindi: $idx"; return ;;
+            tf sch_cancelled_fmt "$idx"; return ;;
     esac
 
     # Recurring schedule: <secs> <command>
     local secs cmd
     secs=$(echo "$1" | awk '{print $1}')
     cmd=$(echo "$1" | awk '{$1=""; sub(/^ /,""); print}')
-    case "$secs" in *[!0-9]*) echo "Kullanım: /schedule <saniye> <komut>"; return ;; esac
-    [ -z "$cmd" ] && { echo "❌ Komut eksik"; return; }
-    [ "$secs" -lt 10 ] && { echo "❌ En az 10 saniye"; return; }
+    case "$secs" in *[!0-9]*) echo "${MSG[sch_invalid_usage]}"; return ;; esac
+    [ -z "$cmd" ] && { echo "${MSG[sch_no_cmd]}"; return; }
+    [ "$secs" -lt 10 ] && { echo "${MSG[sch_min_secs]}"; return; }
 
     local now=$(date +%s)
     local next=$((now + secs))
     mkdir -p "$(dirname "$SCHEDULES_FILE")"
     echo "$next|recur:$secs|$cmd" >> "$SCHEDULES_FILE"
-    echo "🔁 Zamanlandı: her $secs saniyede '$cmd'
-İlki $secs saniye sonra"
+    tf sch_added_fmt "$secs" "$cmd" "$secs"
 }
 
 poll_schedules() {
@@ -1282,30 +1266,23 @@ poll_schedules() {
             # Due — fire
             case "$type" in
                 alarm)
-                    is_quiet_hours || tg_send "$OWNER" "⏰ ALARM
-$rest" >/dev/null
+                    is_quiet_hours || tg_send "$OWNER" "$(printf "${MSG[alarm_fired_fmt]}" "$rest")" >/dev/null
                     log "alarm fired: $rest"
                     ;;
                 recur:*)
                     local interval="${type#recur:}"
-                    # Run command if it's a bot command (starts with /) or shell
                     case "$rest" in
                         /*)
-                            # Pretend it's a message from owner to bot
                             local out
                             out=$(dispatch_for_schedule "$rest")
-                            [ -n "$out" ] && tg_send "$OWNER" "🔁 Schedule [$rest]
-$out" >/dev/null
+                            [ -n "$out" ] && tg_send "$OWNER" "$(printf "${MSG[sch_fire_fmt]}" "$rest" "$out")" >/dev/null
                             ;;
                         *)
-                            # Shell command — run, capture short output
                             local out
                             out=$(sh -c "$rest" 2>&1 | head -c 1500)
-                            tg_send "$OWNER" "🔁 Schedule [$rest]
-$out" >/dev/null
+                            tg_send "$OWNER" "$(printf "${MSG[sch_fire_fmt]}" "$rest" "$out")" >/dev/null
                             ;;
                     esac
-                    # Re-add with next time
                     local next=$((now + interval))
                     echo "$next|$type|$rest" >> "$tmp"
                     log "schedule fired: $rest, next in ${interval}s"
@@ -1335,7 +1312,7 @@ dispatch_for_schedule() {
         /traffic) fmt_traffic ;;
         /load)   fmt_load ;;
         /ip)     cmd_ip ;;
-        *) echo "(unsupported in schedule: $cmd)" ;;
+        *) tf sch_unsupported_fmt "$cmd" ;;
     esac
 }
 

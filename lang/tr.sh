@@ -155,6 +155,70 @@ Yük rehberi:
   < %d.0 = boşta kapasite var
   > %d.0 = kuyruk var, yavaşlamalar olabilir"
 
+    # ─── /quiet_hours ────────────────────────────────────────────────
+    [qh_active]="🔇 sessizdeyiz"
+    [qh_inactive]="🔊 aktif değil"
+    [qh_status_fmt]="Quiet hours: %s:00 — %s:00 (%s)"
+    [qh_not_set]="Quiet hours tanımlı değil.
+Kullanım: /quiet_hours <from> <to>
+Örnek: /quiet_hours 23 7  (gece 23 → sabah 7 sessiz)"
+    [qh_off]="🔊 Quiet hours kapatıldı"
+    [qh_invalid_from]="❌ Geçersiz from"
+    [qh_invalid_to]="❌ Geçersiz to"
+    [qh_range_from]="❌ from 0-23 olmalı"
+    [qh_range_to]="❌ to 0-23 olmalı"
+    [qh_set_fmt]="🔇 Quiet hours: %s:00 — %s:00 (alarmlar bu saatlerde susar)"
+
+    # ─── /heartbeat ──────────────────────────────────────────────────
+    [hb_status_fmt]="❤️ Heartbeat: her %d saatte bir
+Kapatmak: /heartbeat off"
+    [hb_not_set]="Heartbeat kapalı.
+Kullanım: /heartbeat <interval-saat>
+Örnek: /heartbeat 6  (6 saatte bir 'ayaktayım' mesajı)"
+    [hb_disabled]="❤️ Heartbeat kapatıldı"
+    [hb_not_number]="❌ Saat (rakam) olmalı"
+    [hb_min_one]="❌ En az 1 saat"
+    [hb_set_fmt]="❤️ Heartbeat: her %d saatte bir aktive edildi"
+    [hb_ping_fmt]="❤️ Heartbeat — %s, ayaktayım.
+Uptime: %s | Sıcaklık: %s"
+
+    # ─── /alarm ──────────────────────────────────────────────────────
+    [alarm_usage]="Kullanım: /alarm HH:MM <mesaj>
+Örnek: /alarm 14:30 Toplantı zamanı"
+    [alarm_no_msg]="❌ Mesaj eksik"
+    [alarm_bad_hour]="❌ Saat?"
+    [alarm_bad_min]="❌ Dakika?"
+    [alarm_bad_time]="❌ Geçersiz saat"
+    [alarm_set_fmt]="⏰ Alarm: %s:%s (%dsa %02ddk sonra)
+mesaj: %s"
+    [alarm_fired_fmt]="⏰ ALARM
+%s"
+
+    # ─── /schedule ───────────────────────────────────────────────────
+    [sch_empty]="Hiç zamanlama yok.
+
+Kullanım:
+/alarm HH:MM <mesaj>
+/schedule <saniye> <komut>    (tekrarlı)
+/schedule clear               (hepsini sil)"
+    [sch_header]="📅 Zamanlamalar:"
+    [sch_now_label]="şimdi"
+    [sch_sec_fmt]="%dsn"
+    [sch_min_fmt]="%ddk"
+    [sch_hour_fmt]="%dsa %02ddk"
+    [sch_entry_fmt]="  %d. [%s] %s — %s\n"
+    [sch_cleared]="🗑 Tüm zamanlamalar silindi"
+    [sch_cancel_usage]="Kullanım: /schedule cancel <idx>"
+    [sch_cancelled_fmt]="✓ Silindi: %s"
+    [sch_invalid_usage]="Kullanım: /schedule <saniye> <komut>"
+    [sch_no_cmd]="❌ Komut eksik"
+    [sch_min_secs]="❌ En az 10 saniye"
+    [sch_added_fmt]="🔁 Zamanlandı: her %d saniyede '%s'
+İlki %d saniye sonra"
+    [sch_fire_fmt]="🔁 Schedule [%s]
+%s"
+    [sch_unsupported_fmt]="(unsupported in schedule: %s)"
+
     # ─── /speedtest ──────────────────────────────────────────────────
     [st_usage]="Kullanım: /speedtest [PROVIDER] [SIZE] [loop [COUNT]]
 
