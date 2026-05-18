@@ -1470,12 +1470,7 @@ cmd_tailscale() {
     TS_BIN=$(ts_find_bin tailscale)
     TSD_BIN=$(ts_find_bin tailscaled)
     if [ -z "$TS_BIN" ] || [ -z "$TSD_BIN" ]; then
-        echo "❌ tailscale binary'leri bulunamadı.
-Aranan yerler:
-  /system/bin/{tailscale,tailscaled}
-  /data/adb/modules/tailscale-control/system/bin/
-  /data/adb/modules_update/tailscale-control/system/bin/
-tailscale-control modülünü kur."
+        echo "${MSG[ts_binary_missing]}"
         return
     fi
 
@@ -1488,23 +1483,16 @@ tailscale-control modülünü kur."
                 local pid rss
                 pid=$(cat "$TS_PID" 2>/dev/null)
                 rss=$(awk '/^VmRSS:/{print $2}' /proc/"$pid"/status 2>/dev/null)
-                echo "Tailscale: 🟢 AÇIK
-PID: $pid  (RSS: $((rss/1024)) MB)
-IP:  ${ts_ip:-(login bekleniyor)}
-$pinfo
-
-Diğer komutlar: /tailscale {on|off|auth|ip|peers|logout|log}"
+                printf "${MSG[ts_status_on_fmt]}\n" "$pid" "$((rss/1024))" "${ts_ip:-${MSG[ts_ip_pending]}}" "$pinfo"
             else
-                local hint="Açmak için: /tailscale on"
-                [ ! -s "$TS_AUTHKEY" ] && [ ! -s "$TS_STATE" ] && \
-                    hint="Önce: /tailscale auth <key>   sonra: /tailscale on"
-                echo "Tailscale: 🔴 KAPALI
-$hint"
+                local hint="${MSG[ts_hint_on]}"
+                [ ! -s "$TS_AUTHKEY" ] && [ ! -s "$TS_STATE" ] && hint="${MSG[ts_hint_auth_first]}"
+                printf "${MSG[ts_status_off_fmt]}\n" "$hint"
             fi
             ;;
         on)
             if ts_is_running; then
-                echo "Zaten çalışıyor. /tailscale status"
+                echo "${MSG[ts_already_running]}"
                 return
             fi
             mkdir -p "$TS_DIR" "$TS_DIR/cache"
@@ -1535,8 +1523,7 @@ $hint"
             done
             if [ ! -S "$TS_SOCK" ]; then
                 rm -f "$TS_PID"
-                echo "❌ tailscaled başlamadı. Son log:
-$(tail -5 "$TS_LOG" 2>/dev/null)"
+                tf ts_daemon_failed_fmt "$(tail -5 "$TS_LOG" 2>/dev/null)"
                 return
             fi
             # iptables (source-based, adaptive — no -o)
@@ -1555,29 +1542,22 @@ $(tail -5 "$TS_LOG" 2>/dev/null)"
             ts_ip=$(ts_cli ip -4 2>/dev/null | head -1)
             if [ -n "$ts_ip" ]; then
                 log "tailscale on: ip=$ts_ip"
-                echo "✅ Tailscale aktif
-IP: $ts_ip
-Exit-node: advertised (admin panelden onayla)
-Routing: adaptive (default route'u takip eder)"
+                tf ts_active_fmt "$ts_ip"
             else
                 # Login URL fallback (no authkey or new node)
                 local login
                 login=$(echo "$upresp" | grep -oE 'https://login\.tailscale\.com[^ ]*' | head -1)
                 if [ -n "$login" ]; then
-                    echo "🔑 Login gerekli:
-$login
-
-Tarayıcıdan aç, onaylayınca otomatik bağlanır."
+                    tf ts_login_required_fmt "$login"
                 else
-                    echo "⚠️ Up cevabı:
-$(echo "$upresp" | head -c 800)"
+                    tf ts_up_response_fmt "$(echo "$upresp" | head -c 800)"
                 fi
             fi
             ;;
         off)
             if ! ts_is_running; then
                 ts_del_iptables  # cleanup any orphan rules
-                echo "Zaten kapalı (orphan iptables temizlendi)"
+                echo "${MSG[ts_already_off]}"
                 return
             fi
             ts_cli down 2>/dev/null
@@ -1589,25 +1569,20 @@ $(echo "$upresp" | head -c 800)"
             rm -f "$TS_PID"
             ts_del_iptables
             log "tailscale off"
-            echo "🔴 Tailscale kapatıldı
-iptables kuralları silindi
-(VPN'e dokunulmadı)"
+            echo "${MSG[ts_stopped]}"
             ;;
         auth)
             local key
             key=$(echo "$args" | awk '{print $2}')
             if [ -z "$key" ]; then
-                echo "Kullanım: /tailscale auth <tsauth-key>
-Tailscale admin > Settings > Keys > Generate
-Önerilen: reusable + ephemeral"
+                echo "${MSG[ts_auth_usage]}"
                 return
             fi
             mkdir -p "$TS_DIR"
             chmod 700 "$TS_DIR"
             printf "%s" "$key" > "$TS_AUTHKEY"
             chmod 600 "$TS_AUTHKEY"
-            echo "🔑 Auth key kaydedildi ($(wc -c < "$TS_AUTHKEY") byte).
-Şimdi: /tailscale on"
+            tf ts_auth_saved_fmt "$(wc -c < "$TS_AUTHKEY")"
             ;;
         logout)
             if ts_is_running; then
@@ -1620,24 +1595,23 @@ Tailscale admin > Settings > Keys > Generate
             ts_del_iptables
             rm -f "$TS_STATE" "$TS_PID" "$TS_AUTHKEY"
             log "tailscale logout + state wiped"
-            echo "👋 Logout
-State + authkey silindi"
+            echo "${MSG[ts_logout_done]}"
             ;;
         ip)
-            ts_is_running || { echo "Tailscale kapalı"; return; }
+            ts_is_running || { echo "${MSG[ts_off_short]}"; return; }
             ts_cli ip 2>/dev/null
             ;;
         peers)
-            ts_is_running || { echo "Tailscale kapalı"; return; }
+            ts_is_running || { echo "${MSG[ts_off_short]}"; return; }
             ts_cli status 2>/dev/null | head -30
             ;;
         log)
-            [ ! -f "$TS_LOG" ] && { echo "Log yok"; return; }
-            echo "📝 tailscaled son 20 satır:"
+            [ ! -f "$TS_LOG" ] && { echo "${MSG[ts_log_none]}"; return; }
+            echo "${MSG[ts_log_header]}"
             tail -20 "$TS_LOG"
             ;;
         *)
-            echo "Kullanım: /tailscale [on|off|status|auth|ip|peers|logout|log]" ;;
+            echo "${MSG[ts_usage]}" ;;
     esac
 }
 
@@ -1690,8 +1664,7 @@ cmd_update() {
 
     case "$arg" in
         ""|check|status)
-            # List all modules with updateJson, report installed vs latest
-            echo "🔍 Modül güncelleme kontrolü"
+            echo "${MSG[update_header]}"
             echo
             local found=0 outdated=0
             local mod_dir cur_ver cur_vcode cur_id update_url remote_resp remote_ver remote_vcode
@@ -1703,37 +1676,34 @@ cmd_update() {
                 cur_ver=$(awk -F= '/^version=/{print $2; exit}' "$mod_dir/module.prop")
                 cur_vcode=$(awk -F= '/^versionCode=/{print $2; exit}' "$mod_dir/module.prop")
                 found=$((found+1))
-                # Fetch remote updateJson
                 remote_resp=$("$CURL" -sSL --cacert "$CA" --max-time 15 "$update_url" 2>/dev/null)
                 if [ -z "$remote_resp" ]; then
-                    echo "  $cur_id: $cur_ver  ⚠ remote okunamadı"
+                    tf update_remote_unread_fmt "$cur_id" "$cur_ver"
                     continue
                 fi
                 remote_ver=$(echo "$remote_resp"   | "$JQ" -r '.version // empty' 2>/dev/null)
                 remote_vcode=$(echo "$remote_resp" | "$JQ" -r '.versionCode // empty' 2>/dev/null)
                 if [ -z "$remote_vcode" ]; then
-                    echo "  $cur_id: $cur_ver  ⚠ JSON parse hatası"
+                    tf update_parse_fail_fmt "$cur_id" "$cur_ver"
                     continue
                 fi
                 if [ "$remote_vcode" -gt "$cur_vcode" ] 2>/dev/null; then
-                    echo "  📦 $cur_id: $cur_ver → $remote_ver (vCode $cur_vcode→$remote_vcode) ⬆"
+                    tf update_outdated_fmt "$cur_id" "$cur_ver" "$remote_ver" "$cur_vcode" "$remote_vcode"
                     outdated=$((outdated+1))
                 else
-                    echo "  ✓ $cur_id: $cur_ver (güncel)"
+                    tf update_uptodate_fmt "$cur_id" "$cur_ver"
                 fi
             done
             echo
             if [ "$found" -eq 0 ]; then
-                echo "Hiçbir modülde updateJson tanımlı değil."
+                echo "${MSG[update_none_defined]}"
             elif [ "$outdated" -eq 0 ]; then
-                echo "Tüm modüller güncel."
+                echo "${MSG[update_all_current]}"
             else
-                echo "$outdated modül güncellenebilir.
-Hepsini güncelle: /update all
-Tek tek: /update <module-id>"
+                tf update_count_outdated_fmt "$outdated"
             fi ;;
         all)
-            echo "📥 Tüm güncelleme kontrolü + install başlatılıyor..."
+            echo "${MSG[update_all_start]}"
             local total=0 updated=0 failed=0
             local mod_dir update_url cur_id cur_vcode remote_resp remote_ver remote_vcode zipurl
             for mod_dir in /data/adb/modules/*/; do
@@ -1751,54 +1721,48 @@ Tek tek: /update <module-id>"
                     continue
                 fi
                 if [ -z "$zipurl" ]; then
-                    echo "  $cur_id: zipUrl yok, atlandı"
+                    tf update_no_zipurl_fmt "$cur_id"
                     failed=$((failed+1))
                     continue
                 fi
-                echo "  ⬇ $cur_id $remote_ver indiriliyor..."
+                tf update_downloading_fmt "$cur_id" "$remote_ver"
                 local tmp_zip=/data/local/tmp/.update_$cur_id.zip
                 if "$CURL" -sSL --cacert "$CA" --max-time 300 -o "$tmp_zip" "$zipurl"; then
                     if magisk --install-module "$tmp_zip" 2>&1 | grep -q "Done"; then
-                        # Live-copy critical files for immediate effect (no reboot)
                         if [ "$cur_id" = "statusbot" ] && [ -f "/data/adb/modules_update/statusbot/bot/bot.sh" ]; then
                             cp /data/adb/modules_update/statusbot/bot/bot.sh /data/adb/modules/statusbot/bot/bot.sh
                             chmod 755 /data/adb/modules/statusbot/bot/bot.sh
                         fi
-                        echo "  ✅ $cur_id → $remote_ver"
+                        tf update_installed_fmt "$cur_id" "$remote_ver"
                         updated=$((updated+1))
                     else
-                        echo "  ❌ $cur_id install başarısız"
+                        tf update_install_failed_fmt "$cur_id"
                         failed=$((failed+1))
                     fi
                     rm -f "$tmp_zip"
                 else
-                    echo "  ❌ $cur_id download başarısız"
+                    tf update_download_failed_fmt "$cur_id"
                     failed=$((failed+1))
                 fi
             done
             echo
-            echo "📊 Özet: $total kontrol edildi, $updated güncellendi, $failed başarısız"
+            tf update_summary_fmt "$total" "$updated" "$failed"
             if [ "$updated" -gt 0 ]; then
-                echo "
-Binary'ler değişti ise tam etki için reboot tavsiye edilir.
-statusbot kendisi güncellendiyse 10 sn içinde restart (supervisor)."
-                # If statusbot was updated, schedule self-restart
+                echo "${MSG[update_reboot_hint]}"
                 if grep -q "statusbot.*✅" /data/statusbot/bot.log.tmp 2>/dev/null; then
                     ( sleep 3; kill $(cat "$DATADIR/bot.pid" 2>/dev/null) ) &
                 fi
             fi ;;
         *)
-            # Specific module ID
             local mod_dir="/data/adb/modules/$arg"
             if [ ! -d "$mod_dir" ]; then
-                echo "❌ Modül bulunamadı: $arg
-Liste için: /update"
+                tf update_module_not_found_fmt "$arg"
                 return
             fi
             local update_url cur_vcode cur_id remote_resp remote_vcode remote_ver zipurl
             update_url=$(awk -F= '/^updateJson=/{print $2; exit}' "$mod_dir/module.prop")
             if [ -z "$update_url" ]; then
-                echo "❌ $arg için updateJson tanımlı değil"
+                tf update_no_updatejson_fmt "$arg"
                 return
             fi
             cur_id=$(awk -F= '/^id=/{print $2; exit}' "$mod_dir/module.prop")
@@ -1808,34 +1772,31 @@ Liste için: /update"
             remote_ver=$(echo "$remote_resp"   | "$JQ" -r '.version // empty' 2>/dev/null)
             zipurl=$(echo "$remote_resp"       | "$JQ" -r '.zipUrl // empty' 2>/dev/null)
             if [ -z "$remote_vcode" ]; then
-                echo "❌ Remote okunamadı: $(echo "$remote_resp" | head -c 200)"
+                tf update_remote_unread_long_fmt "$(echo "$remote_resp" | head -c 200)"
                 return
             fi
             if [ "$remote_vcode" -le "$cur_vcode" ] 2>/dev/null; then
-                echo "✓ $cur_id zaten güncel ($remote_ver)"
+                tf update_already_current_fmt "$cur_id" "$remote_ver"
                 return
             fi
-            echo "⬇ $cur_id $remote_ver indiriliyor..."
+            tf update_downloading_fmt "$cur_id" "$remote_ver"
             local tmp_zip=/data/local/tmp/.update_$cur_id.zip
             "$CURL" -sSL --cacert "$CA" --max-time 300 -o "$tmp_zip" "$zipurl" || {
-                echo "❌ Download başarısız"; return; }
+                echo "${MSG[update_download_failed]}"; return; }
             local install_out
             install_out=$(magisk --install-module "$tmp_zip" 2>&1)
             rm -f "$tmp_zip"
             if echo "$install_out" | grep -q "Done"; then
-                # Live-copy for statusbot (no reboot needed)
                 if [ "$cur_id" = "statusbot" ] && [ -f "/data/adb/modules_update/statusbot/bot/bot.sh" ]; then
                     cp /data/adb/modules_update/statusbot/bot/bot.sh /data/adb/modules/statusbot/bot/bot.sh
                     chmod 755 /data/adb/modules/statusbot/bot/bot.sh
-                    echo "✅ statusbot $remote_ver kuruldu, bot 5 sn içinde restart..."
+                    tf update_self_installed_fmt "$remote_ver"
                     ( sleep 5; kill $(cat "$DATADIR/bot.pid" 2>/dev/null) ) &
                 else
-                    echo "✅ $cur_id $remote_ver kuruldu
-Binary değiştiyse reboot tavsiye edilir."
+                    tf update_other_installed_fmt "$cur_id" "$remote_ver"
                 fi
             else
-                echo "❌ Install başarısız:
-$(echo "$install_out" | tail -5)"
+                tf update_install_failed_long_fmt "$(echo "$install_out" | tail -5)"
             fi ;;
     esac
 }
@@ -2212,27 +2173,25 @@ cmd_perf_balanced() {
     local mhz=1800
     case "$arg" in
         ""|status)
-            echo "⚖️ Perf Balanced — current caps:"
+            echo "${MSG[pb_header]}"
             for p in /sys/devices/system/cpu/cpufreq/policy4 /sys/devices/system/cpu/cpufreq/policy7; do
                 [ -d "$p" ] || continue
                 local cur_max hw_max
                 cur_max=$(cat "$p/scaling_max_freq" 2>/dev/null)
                 hw_max=$(cat "$p/cpuinfo_max_freq" 2>/dev/null)
-                printf "  %s: cap=%d MHz  (hw_max=%d MHz)\n" \
+                printf "${MSG[pb_policy_fmt]}" \
                     "$(basename "$p")" "$((cur_max/1000))" "$((hw_max/1000))"
             done
             echo
             local pmode
             pmode=$(zte_get "performance_mode" 2>/dev/null | "$JQ" -r '.performance_mode // empty' 2>/dev/null)
             case "$pmode" in
-                1) echo "Performance hint: AÇIK 🟢 → big cluster wakeable" ;;
-                0) echo "Performance hint: KAPALI ⚪ → big cluster offline kilitli
-   /perf_balanced'ın etkili olması için: /performance on + reboot" ;;
-                *) echo "Performance hint: ? (okunamadı)" ;;
+                1) echo "${MSG[pb_hint_on]}" ;;
+                0) echo "${MSG[pb_hint_off]}" ;;
+                *) echo "${MSG[pb_hint_unread]}" ;;
             esac
             echo
-            echo "Uygulamak: /perf_balanced [mhz]   (default 1800)
-Sıfırlamak: /perf_balanced reset"
+            echo "${MSG[pb_usage]}"
             return ;;
         reset)
             local ok=0
@@ -2251,18 +2210,17 @@ Sıfırlamak: /perf_balanced reset"
                     ok=$((ok+1))
                 fi
             done
-            echo "✅ $ok policy cap'i sıfırlandı (hw max'a açıldı)
-Performance hint'i değiştirilmedi."
+            tf pb_reset_fmt "$ok"
             return ;;
         *[!0-9]*)
-            echo "❌ Geçersiz mhz: $arg
-Kullanım: /perf_balanced [mhz|reset]" ; return ;;
+            tf pb_invalid_mhz_fmt "$arg"
+            return ;;
         *)
             mhz="$arg" ;;
     esac
 
-    [ "$mhz" -lt 500 ] && { echo "❌ En az 500 MHz"; return; }
-    [ "$mhz" -gt 3000 ] && { echo "❌ En çok 3000 MHz"; return; }
+    [ "$mhz" -lt 500 ] && { echo "${MSG[pb_too_low]}"; return; }
+    [ "$mhz" -gt 3000 ] && { echo "${MSG[pb_too_high]}"; return; }
     local khz=$((mhz * 1000))
 
     # Apply cap to mid + big clusters (little untouched)
@@ -2288,22 +2246,16 @@ Kullanım: /perf_balanced [mhz|reset]" ; return ;;
     done
 
     if [ "$applied" -eq 0 ]; then
-        echo "❌ Hiçbir cluster'a uygulanamadı"
+        echo "${MSG[pb_no_clusters]}"
         return
     fi
 
     local pmode warn=""
     pmode=$(zte_get "performance_mode" 2>/dev/null | "$JQ" -r '.performance_mode // empty' 2>/dev/null)
     if [ "$pmode" != "1" ]; then
-        warn="
-
-⚠ Performance hint KAPALI — big cluster boot'tan beri offline.
-  Tam fayda için: /performance on → cihazı reboot et → sonra bu komutu tekrar çalıştır."
+        warn="${MSG[pb_warn_hint_off]}"
     fi
-    echo "⚖️ Perf Balanced uygulandı ($applied cluster):$lines
-$warn
-
-Reboot'ta cap sıfırlanır (sysfs RAM-only — risk yok)."
+    printf "${MSG[pb_applied_fmt]}\n" "$applied" "$lines" "$warn"
 }
 
 # ─── minimal mode (allowlist-based, transient) ───────────────────────────
@@ -2351,49 +2303,11 @@ cmd_minimal_mode() {
             local mem_avail disabled_count
             mem_avail=$(awk '/^MemAvailable:/{printf "%d", $2/1024}' /proc/meminfo)
             disabled_count=$(pm list packages -d 2>/dev/null | wc -l)
-            # Count user-installed packages still running
             local running_total
             running_total=$(ps -A -o name 2>/dev/null | grep -cE '^com\.|^android\.' || echo 0)
-            echo "📦 Minimal Mode
-
-RAM kullanılabilir: ${mem_avail} MB
-Disabled paketler: $disabled_count
-Çalışan com.* süreçler: $running_total
-
-Komutlar:
-  /minimal_mode on       — Allowlist hariç HER ŞEYİ force-stop'la
-                            (cellular/SMS/root/VPN/bot dokunulmaz)
-                            Reboot resetler. Brick riski: yok.
-                            ⚠ /performance geçici kullanılamaz
-  /minimal_mode persist  — on + SystemUI/Launcher/zte.web kalıcı disable
-                            ~640 MB kazanç. Reboot'ta korunur.
-                            /minimal_mode off ile geri açılır.
-  /minimal_mode off      — Disable'ları enable'a çevir (reboot tavsiye)
-  /minimal_mode list     — Şu an allowlist'te tutulanlar
-  /minimal_mode preview  — \"on\" denese ne öldürür (test etmeden)" ;;
+            tf mm_status_fmt "$mem_avail" "$disabled_count" "$running_total" ;;
         list|keep)
-            echo "🛡 Allowlist (bunlar KALIR, hepsi gerekli):
-
-Android core:
-  android, system_server, zygote, kernel threads
-Cellular/SMS:
-  com.android.phone, com.android.subsys, com.android.smspush,
-  com.android.se, com.android.providers.telephony,
-  com.android.cellbroadcast*, com.android.networkstack*,
-  com.android.NetworkStatsServer
-  com.spreadtrum.*, com.sprd.*  (radio/IMS)
-Storage/permissions:
-  com.android.providers.media*, com.android.providers.settings,
-  com.android.providers.contacts, com.android.permissioncontroller,
-  com.android.shell, com.android.captiveportallogin,
-  com.android.location.fused
-Magisk:
-  com.topjohnwu.magisk*
-Thermal:
-  com.zte.thermalbridge, com.zte.telephony.api
-VPN:
-  com.v2ray.*, com.wireguard.*, com.openvpn.*, com.protonvpn.*
-[Bot kendisi root süreci, paket değil — etkilenmez]" ;;
+            echo "${MSG[mm_allowlist]}" ;;
         preview)
             local would_kill=0 keep=0
             local pkg
@@ -2407,10 +2321,7 @@ VPN:
                 fi
             done < "$DATADIR/.pkgs.tmp"
             rm -f "$DATADIR/.pkgs.tmp"
-            echo "👁 Preview: 'on' çalıştırılsa
-  Allowlist'te tutulur: $keep paket
-  force-stop hedefi:    $would_kill paket
-(çoğu zaten çalışmıyor olabilir, no-op)" ;;
+            tf mm_preview_fmt "$keep" "$would_kill" ;;
         on|kill)
             local killed=0 skipped=0 mem_before mem_after pkg
             mem_before=$(awk '/^MemAvailable:/{printf "%d", $2/1024}' /proc/meminfo)
@@ -2427,18 +2338,10 @@ VPN:
             sleep 2
             mem_after=$(awk '/^MemAvailable:/{printf "%d", $2/1024}' /proc/meminfo)
             log "minimal_mode on: killed=$killed kept=$skipped mem_delta=$((mem_after-mem_before))"
-            echo "💨 Transient kill
-$killed paket force-stop edildi ($skipped allowlist'te tutuldu)
-RAM: $mem_before MB → $mem_after MB (kazanç $((mem_after-mem_before)) MB)
-
-⚠ Şu komutlar geçici çalışmaz: /performance (com.zte.web kapandı)
-✓ Reboot'ta her şey clean state'e döner — brick riski yok
-Daha kalıcı: /minimal_mode persist" ;;
-        persist|disable)
-            # Transient kill first, then persist disable respawners
+            tf mm_transient_done_fmt "$killed" "$skipped" "$mem_before" "$mem_after" "$((mem_after-mem_before))" ;;
+        persist|disable_all)
             local killed=0 disabled=0 mem_before mem_after pkg
             mem_before=$(awk '/^MemAvailable:/{printf "%d", $2/1024}' /proc/meminfo)
-            # Step 1: transient force-stop of everything not in allowlist
             pm list packages 2>/dev/null > "$DATADIR/.pkgs.tmp"
             while IFS= read -r pkg; do
                 pkg="${pkg#package:}"
@@ -2446,7 +2349,6 @@ Daha kalıcı: /minimal_mode persist" ;;
                 am force-stop "$pkg" 2>/dev/null && killed=$((killed+1))
             done < "$DATADIR/.pkgs.tmp"
             rm -f "$DATADIR/.pkgs.tmp"
-            # Step 2: pm disable-user on heavy respawners (tracked for later revert)
             for pkg in $MIN_PKGS_RESPAWN; do
                 if pm disable-user --user 0 "$pkg" 2>/dev/null | grep -q "disabled"; then
                     am force-stop "$pkg" 2>/dev/null
@@ -2457,18 +2359,8 @@ Daha kalıcı: /minimal_mode persist" ;;
             sleep 2
             mem_after=$(awk '/^MemAvailable:/{printf "%d", $2/1024}' /proc/meminfo)
             log "minimal_mode persist: killed=$killed disabled=$disabled mem_delta=$((mem_after-mem_before))"
-            echo "🧊 Persist mode aktif
-Force-stop: $killed paket
-Disable-user: $disabled paket (SystemUI/Launcher/zte.web)
-RAM: $mem_before MB → $mem_after MB (kazanç $((mem_after-mem_before)) MB)
-
-⚠ /performance kullanılamaz (com.zte.web disabled)
-⚠ Web UI (192.168.0.1:8080) gelmez
-✓ Reboot'tan sonra da kapalı kalır
-✓ Geri açmak: /minimal_mode off (sonra reboot tavsiye)" ;;
+            tf mm_persist_done_fmt "$killed" "$disabled" "$mem_before" "$mem_after" "$((mem_after-mem_before))" ;;
         off|restore|reset)
-            # Re-enable ONLY packages we tracked as disabled (not random pre-existing
-            # disabled apps that the user/system intentionally disabled).
             local enabled=0 pkg
             if [ -s "$MIN_DISABLED_FILE" ]; then
                 while IFS= read -r pkg; do
@@ -2480,40 +2372,33 @@ RAM: $mem_before MB → $mem_after MB (kazanç $((mem_after-mem_before)) MB)
                 rm -f "$MIN_DISABLED_FILE"
             fi
             log "minimal_mode off: enabled=$enabled"
-            echo "✅ Minimal Mode kapatıldı
-$enabled tracked paket geri enable edildi (sadece bizim disable ettiklerimiz).
-Force-stop edilenler gerektiğinde Android tarafından başlatılır.
-Tam temiz state için: cihazı reboot et." ;;
+            tf mm_off_done_fmt "$enabled" ;;
         disabled|tracked|disabled_list)
             if [ ! -s "$MIN_DISABLED_FILE" ]; then
-                echo "📋 Hiç tracked-disable paket yok"
+                echo "${MSG[mm_disabled_none]}"
                 return
             fi
-            echo "📋 Bot tarafından disable edilen paketler:"
+            echo "${MSG[mm_disabled_header]}"
             local i=0 pkg state
             while IFS= read -r pkg; do
                 [ -z "$pkg" ] && continue
                 i=$((i+1))
-                # Verify it's actually still disabled
                 if pm list packages -d 2>/dev/null | grep -qF "package:$pkg"; then
-                    state="❄ disabled"
+                    state="${MSG[mm_disabled_state_disabled]}"
                 else
-                    state="? mismatch (already enabled)"
+                    state="${MSG[mm_disabled_state_mismatch]}"
                 fi
                 printf "  %d. %s  %s\n" "$i" "$pkg" "$state"
             done < "$MIN_DISABLED_FILE"
             echo
-            echo "Tek tek aç: /minimal_mode enable <pkg>
-Hepsini aç: /minimal_mode off" ;;
+            echo "${MSG[mm_disabled_footer]}" ;;
         enable)
             local target
             target=$(echo "$1" | awk '{print $2}')
             if [ -z "$target" ]; then
-                echo "Kullanım: /minimal_mode enable <pkg>
-Mevcut tracked liste: /minimal_mode disabled"
+                echo "${MSG[mm_enable_usage]}"
                 return
             fi
-            # Allow partial match if no exact match
             local pkg=""
             if [ -s "$MIN_DISABLED_FILE" ]; then
                 if grep -qxF "$target" "$MIN_DISABLED_FILE"; then
@@ -2523,8 +2408,7 @@ Mevcut tracked liste: /minimal_mode disabled"
                 fi
             fi
             if [ -z "$pkg" ]; then
-                echo "❌ '$target' tracked listesinde yok.
-Yine de zorla enable: pm enable $target  (shell)"
+                tf mm_enable_not_tracked_fmt "$target" "$target"
                 return
             fi
             local result
@@ -2533,23 +2417,19 @@ Yine de zorla enable: pm enable $target  (shell)"
                 *enabled*)
                     min_untrack "$pkg"
                     log "minimal_mode enable: $pkg"
-                    echo "✅ $pkg geri açıldı (tracked listeden çıkarıldı)" ;;
+                    tf mm_enable_success_fmt "$pkg" ;;
                 *)
-                    echo "❌ Başarısız: $result" ;;
+                    tf mm_enable_failed_fmt "$result" ;;
             esac ;;
         disable)
-            # Manual: disable a specific package, track it
             local target
             target=$(echo "$1" | awk '{print $2}')
             if [ -z "$target" ]; then
-                echo "Kullanım: /minimal_mode disable <pkg>"
+                echo "${MSG[mm_disable_usage]}"
                 return
             fi
-            # Check allowlist — refuse essential ones
             if echo "$target" | grep -qE "$MIN_KEEP_RE"; then
-                echo "❌ '$target' essentials listesinde (cellular/SMS/root/VPN).
-Bu paketi disable etmek sistemi kırabilir. İstersen:
-  pm disable-user --user 0 $target  (shell — sorumluluk sana ait)"
+                tf mm_disable_essential_fmt "$target" "$target"
                 return
             fi
             local result
@@ -2559,28 +2439,12 @@ Bu paketi disable etmek sistemi kırabilir. İstersen:
                     am force-stop "$target" 2>/dev/null
                     min_track_disabled "$target"
                     log "minimal_mode disable: $target"
-                    echo "❄ $target disable edildi + tracked
-Geri açmak: /minimal_mode enable $target" ;;
+                    tf mm_disable_success_fmt "$target" "$target" ;;
                 *)
-                    echo "❌ Başarısız: $result" ;;
+                    tf mm_disable_failed_fmt "$result" ;;
             esac ;;
         *)
-            echo "Kullanım: /minimal_mode <subcommand>
-
-Toplu işlemler:
-  on / kill      — Allowlist hariç hepsi force-stop (transient)
-  persist        — on + SystemUI/Launcher/zte.web disable (tracked)
-  off / restore  — Bizim disable ettiklerimizi geri aç
-
-Sorgulama:
-  status         — Genel durum
-  preview        — 'on' kaç paketi öldürür (test etmeden)
-  list / keep    — Allowlist
-  disabled       — Tracked liste (bot'un kapadığı paketler)
-
-Tekil:
-  disable <pkg>  — Bir paketi disable et + tracked
-  enable <pkg>   — Tracked listeden bir paketi aç" ;;
+            echo "${MSG[mm_usage]}" ;;
     esac
 }
 

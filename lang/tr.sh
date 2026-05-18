@@ -155,6 +155,211 @@ Yük rehberi:
   < %d.0 = boşta kapasite var
   > %d.0 = kuyruk var, yavaşlamalar olabilir"
 
+    # ─── /minimal_mode ───────────────────────────────────────────────
+    [mm_status_fmt]="📦 Minimal Mode
+
+RAM kullanılabilir: %d MB
+Disabled paketler: %d
+Çalışan com.* süreçler: %d
+
+Komutlar:
+  /minimal_mode on       — Allowlist hariç HER ŞEYİ force-stop'la
+                            (cellular/SMS/root/VPN/bot dokunulmaz)
+                            Reboot resetler. Brick riski: yok.
+                            ⚠ /performance geçici kullanılamaz
+  /minimal_mode persist  — on + SystemUI/Launcher/zte.web kalıcı disable
+                            ~640 MB kazanç. Reboot'ta korunur.
+                            /minimal_mode off ile geri açılır.
+  /minimal_mode off      — Disable'ları enable'a çevir (reboot tavsiye)
+  /minimal_mode list     — Şu an allowlist'te tutulanlar
+  /minimal_mode preview  — 'on' denese ne öldürür (test etmeden)"
+    [mm_allowlist]="🛡 Allowlist (bunlar KALIR, hepsi gerekli):
+
+Android core:
+  android, system_server, zygote, kernel threads
+Cellular/SMS:
+  com.android.phone, com.android.subsys, com.android.smspush,
+  com.android.se, com.android.providers.telephony,
+  com.android.cellbroadcast*, com.android.networkstack*,
+  com.android.NetworkStatsServer
+  com.spreadtrum.*, com.sprd.*  (radio/IMS)
+Storage/permissions:
+  com.android.providers.media*, com.android.providers.settings,
+  com.android.providers.contacts, com.android.permissioncontroller,
+  com.android.shell, com.android.captiveportallogin,
+  com.android.location.fused
+Magisk:
+  com.topjohnwu.magisk*
+Thermal:
+  com.zte.thermalbridge, com.zte.telephony.api
+VPN:
+  com.v2ray.*, com.wireguard.*, com.openvpn.*, com.protonvpn.*
+[Bot kendisi root süreci, paket değil — etkilenmez]"
+    [mm_preview_fmt]="👁 Preview: 'on' çalıştırılsa
+  Allowlist'te tutulur: %d paket
+  force-stop hedefi:    %d paket
+(çoğu zaten çalışmıyor olabilir, no-op)"
+    [mm_transient_done_fmt]="💨 Transient kill
+%d paket force-stop edildi (%d allowlist'te tutuldu)
+RAM: %d MB → %d MB (kazanç %d MB)
+
+⚠ Şu komutlar geçici çalışmaz: /performance (com.zte.web kapandı)
+✓ Reboot'ta her şey clean state'e döner — brick riski yok
+Daha kalıcı: /minimal_mode persist"
+    [mm_persist_done_fmt]="🧊 Persist mode aktif
+Force-stop: %d paket
+Disable-user: %d paket (SystemUI/Launcher/zte.web)
+RAM: %d MB → %d MB (kazanç %d MB)
+
+⚠ /performance kullanılamaz (com.zte.web disabled)
+⚠ Web UI (192.168.0.1:8080) gelmez
+✓ Reboot'tan sonra da kapalı kalır
+✓ Geri açmak: /minimal_mode off (sonra reboot tavsiye)"
+    [mm_off_done_fmt]="✅ Minimal Mode kapatıldı
+%d tracked paket geri enable edildi (sadece bizim disable ettiklerimiz).
+Force-stop edilenler gerektiğinde Android tarafından başlatılır.
+Tam temiz state için: cihazı reboot et."
+    [mm_disabled_none]="📋 Hiç tracked-disable paket yok"
+    [mm_disabled_header]="📋 Bot tarafından disable edilen paketler:"
+    [mm_disabled_state_disabled]="❄ disabled"
+    [mm_disabled_state_mismatch]="? mismatch (already enabled)"
+    [mm_disabled_footer]="Tek tek aç: /minimal_mode enable <pkg>
+Hepsini aç: /minimal_mode off"
+    [mm_enable_usage]="Kullanım: /minimal_mode enable <pkg>
+Mevcut tracked liste: /minimal_mode disabled"
+    [mm_enable_not_tracked_fmt]="❌ '%s' tracked listesinde yok.
+Yine de zorla enable: pm enable %s  (shell)"
+    [mm_enable_success_fmt]="✅ %s geri açıldı (tracked listeden çıkarıldı)"
+    [mm_enable_failed_fmt]="❌ Başarısız: %s"
+    [mm_disable_usage]="Kullanım: /minimal_mode disable <pkg>"
+    [mm_disable_essential_fmt]="❌ '%s' essentials listesinde (cellular/SMS/root/VPN).
+Bu paketi disable etmek sistemi kırabilir. İstersen:
+  pm disable-user --user 0 %s  (shell — sorumluluk sana ait)"
+    [mm_disable_success_fmt]="❄ %s disable edildi + tracked
+Geri açmak: /minimal_mode enable %s"
+    [mm_disable_failed_fmt]="❌ Başarısız: %s"
+    [mm_usage]="Kullanım: /minimal_mode <subcommand>
+
+Toplu işlemler:
+  on / kill      — Allowlist hariç hepsi force-stop (transient)
+  persist        — on + SystemUI/Launcher/zte.web disable (tracked)
+  off / restore  — Bizim disable ettiklerimizi geri aç
+
+Sorgulama:
+  status         — Genel durum
+  preview        — 'on' kaç paketi öldürür (test etmeden)
+  list / keep    — Allowlist
+  disabled       — Tracked liste (bot'un kapadığı paketler)
+
+Tekil:
+  disable <pkg>  — Bir paketi disable et + tracked
+  enable <pkg>   — Tracked listeden bir paketi aç"
+
+    # ─── /perf_balanced ──────────────────────────────────────────────
+    [pb_header]="⚖️ Perf Balanced — mevcut cap'ler:"
+    [pb_policy_fmt]="  %s: cap=%d MHz  (hw_max=%d MHz)\n"
+    [pb_hint_on]="Performance hint: AÇIK 🟢 → big cluster wakeable"
+    [pb_hint_off]="Performance hint: KAPALI ⚪ → big cluster offline kilitli
+   /perf_balanced'ın etkili olması için: /performance on + reboot"
+    [pb_hint_unread]="Performance hint: ? (okunamadı)"
+    [pb_usage]="Uygulamak: /perf_balanced [mhz]   (default 1800)
+Sıfırlamak: /perf_balanced reset"
+    [pb_reset_fmt]="✅ %d policy cap'i sıfırlandı (hw max'a açıldı).
+Performance hint'i değiştirilmedi."
+    [pb_invalid_mhz_fmt]="❌ Geçersiz mhz: %s
+Kullanım: /perf_balanced [mhz|reset]"
+    [pb_too_low]="❌ En az 500 MHz"
+    [pb_too_high]="❌ En çok 3000 MHz"
+    [pb_no_clusters]="❌ Hiçbir cluster'a uygulanamadı"
+    [pb_warn_hint_off]="
+
+⚠ Performance hint KAPALI — big cluster boot'tan beri offline.
+  Tam fayda için: /performance on → cihazı reboot et → sonra bu komutu tekrar çalıştır."
+    [pb_applied_fmt]="⚖️ Perf Balanced uygulandı (%d cluster):%s
+%s
+
+Reboot'ta cap sıfırlanır (sysfs RAM-only — risk yok)."
+
+    # ─── /update ──────────────────────────────────────────────────────
+    [update_header]="🔍 Modül güncelleme kontrolü"
+    [update_remote_unread_fmt]="  %s: %s  ⚠ remote okunamadı"
+    [update_parse_fail_fmt]="  %s: %s  ⚠ JSON parse hatası"
+    [update_outdated_fmt]="  📦 %s: %s → %s (vCode %d→%d) ⬆"
+    [update_uptodate_fmt]="  ✓ %s: %s (güncel)"
+    [update_none_defined]="Hiçbir modülde updateJson tanımlı değil."
+    [update_all_current]="Tüm modüller güncel."
+    [update_count_outdated_fmt]="%d modül güncellenebilir.
+Hepsini güncelle: /update all
+Tek tek: /update <module-id>"
+    [update_all_start]="📥 Tüm güncelleme kontrolü + install başlatılıyor…"
+    [update_no_zipurl_fmt]="  %s: zipUrl yok, atlandı"
+    [update_downloading_fmt]="  ⬇ %s %s indiriliyor…"
+    [update_installed_fmt]="  ✅ %s → %s"
+    [update_install_failed_fmt]="  ❌ %s install başarısız"
+    [update_download_failed_fmt]="  ❌ %s download başarısız"
+    [update_summary_fmt]="📊 Özet: %d kontrol edildi, %d güncellendi, %d başarısız"
+    [update_reboot_hint]="
+Binary'ler değişti ise tam etki için reboot tavsiye edilir.
+statusbot kendisi güncellendiyse 10 sn içinde restart (supervisor)."
+    [update_module_not_found_fmt]="❌ Modül bulunamadı: %s
+Liste için: /update"
+    [update_no_updatejson_fmt]="❌ %s için updateJson tanımlı değil"
+    [update_remote_unread_long_fmt]="❌ Remote okunamadı: %s"
+    [update_already_current_fmt]="✓ %s zaten güncel (%s)"
+    [update_download_failed]="❌ Download başarısız"
+    [update_self_installed_fmt]="✅ statusbot %s kuruldu, bot 5 sn içinde restart…"
+    [update_other_installed_fmt]="✅ %s %s kuruldu
+Binary değiştiyse reboot tavsiye edilir."
+    [update_install_failed_long_fmt]="❌ Install başarısız:
+%s"
+
+    # ─── /tailscale ───────────────────────────────────────────────────
+    [ts_binary_missing]="❌ tailscale binary'leri bulunamadı.
+Aranan yerler:
+  /system/bin/{tailscale,tailscaled}
+  /data/adb/modules/tailscale-control/system/bin/
+  /data/adb/modules_update/tailscale-control/system/bin/
+tailscale-control modülünü kur."
+    [ts_status_on_fmt]="Tailscale: 🟢 AÇIK
+PID: %s  (RSS: %d MB)
+IP:  %s
+%s
+
+Diğer komutlar: /tailscale {on|off|auth|ip|peers|logout|log}"
+    [ts_ip_pending]="(login bekleniyor)"
+    [ts_status_off_fmt]="Tailscale: 🔴 KAPALI
+%s"
+    [ts_hint_on]="Açmak için: /tailscale on"
+    [ts_hint_auth_first]="Önce: /tailscale auth <key>   sonra: /tailscale on"
+    [ts_already_running]="Zaten çalışıyor. /tailscale status"
+    [ts_daemon_failed_fmt]="❌ tailscaled başlamadı. Son log:
+%s"
+    [ts_active_fmt]="✅ Tailscale aktif
+IP: %s
+Exit-node: advertised (admin panelden onayla)
+Routing: adaptive (default route'u takip eder)"
+    [ts_login_required_fmt]="🔑 Login gerekli:
+%s
+
+Tarayıcıdan aç, onaylayınca otomatik bağlanır."
+    [ts_up_response_fmt]="⚠️ Up cevabı:
+%s"
+    [ts_already_off]="Zaten kapalı (orphan iptables temizlendi)"
+    [ts_stopped]="🔴 Tailscale kapatıldı
+iptables kuralları silindi
+(VPN'e dokunulmadı)"
+    [ts_auth_usage]="Kullanım: /tailscale auth <tsauth-key>
+Tailscale admin > Settings > Keys > Generate
+Önerilen: reusable + ephemeral"
+    [ts_auth_saved_fmt]="🔑 Auth key kaydedildi (%d byte).
+Şimdi: /tailscale on"
+    [ts_logout_done]="👋 Logout
+State + authkey silindi"
+    [ts_off_short]="Tailscale kapalı"
+    [ts_log_none]="Log yok"
+    [ts_log_header]="📝 tailscaled son 20 satır:"
+    [ts_usage]="Kullanım: /tailscale [on|off|status|auth|ip|peers|logout|log]"
+
     # ─── /performance ─────────────────────────────────────────────────
     [perf_status_on]="⚡ Performance Modu: AÇIK 🟢
 Kapatmak: /performance off"

@@ -165,6 +165,211 @@ Load guide:
   < %d.0 = headroom available
   > %d.0 = queue, slowdowns possible"
 
+    # ─── /minimal_mode ───────────────────────────────────────────────
+    [mm_status_fmt]="📦 Minimal Mode
+
+RAM available:   %d MB
+Disabled packages: %d
+Running com.* processes: %d
+
+Commands:
+  /minimal_mode on       — Force-stop EVERYTHING except the allowlist
+                            (cellular/SMS/root/VPN/bot are untouched)
+                            Reboot reverts. No brick risk.
+                            ⚠ /performance is temporarily unusable
+  /minimal_mode persist  — on + persist-disable SystemUI/Launcher/zte.web
+                            ~640 MB freed. Survives reboot.
+                            Revert: /minimal_mode off
+  /minimal_mode off      — Re-enable disabled packages (reboot recommended)
+  /minimal_mode list     — Show what's kept on (the allowlist)
+  /minimal_mode preview  — What 'on' would kill (without running it)"
+    [mm_allowlist]="🛡 Allowlist (these stay, all required):
+
+Android core:
+  android, system_server, zygote, kernel threads
+Cellular/SMS:
+  com.android.phone, com.android.subsys, com.android.smspush,
+  com.android.se, com.android.providers.telephony,
+  com.android.cellbroadcast*, com.android.networkstack*,
+  com.android.NetworkStatsServer
+  com.spreadtrum.*, com.sprd.*  (radio/IMS)
+Storage/permissions:
+  com.android.providers.media*, com.android.providers.settings,
+  com.android.providers.contacts, com.android.permissioncontroller,
+  com.android.shell, com.android.captiveportallogin,
+  com.android.location.fused
+Magisk:
+  com.topjohnwu.magisk*
+Thermal:
+  com.zte.thermalbridge, com.zte.telephony.api
+VPN:
+  com.v2ray.*, com.wireguard.*, com.openvpn.*, com.protonvpn.*
+[The bot itself is a root process, not a package — never affected]"
+    [mm_preview_fmt]="👁 Preview: if 'on' ran
+  Kept by allowlist:    %d packages
+  force-stop targets:   %d packages
+(most may not be running — no-op for those)"
+    [mm_transient_done_fmt]="💨 Transient kill
+%d packages force-stopped (%d kept by allowlist)
+RAM: %d MB → %d MB (gain %d MB)
+
+⚠ These will be temporarily unavailable: /performance (com.zte.web is killed)
+✓ Reboot restores clean state — no brick risk
+For a stickier mode: /minimal_mode persist"
+    [mm_persist_done_fmt]="🧊 Persist mode active
+Force-stop: %d packages
+Disable-user: %d packages (SystemUI/Launcher/zte.web)
+RAM: %d MB → %d MB (gain %d MB)
+
+⚠ /performance is unavailable (com.zte.web disabled)
+⚠ Web UI (192.168.0.1:8080) won't respond
+✓ Stays off across reboots
+✓ Revert: /minimal_mode off (reboot recommended after)"
+    [mm_off_done_fmt]="✅ Minimal Mode disabled
+%d tracked packages re-enabled (only the ones we disabled).
+Force-stopped ones are restarted by Android on demand.
+For a fully clean state: reboot the device."
+    [mm_disabled_none]="📋 No tracked-disabled package"
+    [mm_disabled_header]="📋 Packages disabled by the bot:"
+    [mm_disabled_state_disabled]="❄ disabled"
+    [mm_disabled_state_mismatch]="? mismatch (already enabled)"
+    [mm_disabled_footer]="One-by-one revert: /minimal_mode enable <pkg>
+Revert all:        /minimal_mode off"
+    [mm_enable_usage]="Usage: /minimal_mode enable <pkg>
+Tracked list: /minimal_mode disabled"
+    [mm_enable_not_tracked_fmt]="❌ '%s' is not in the tracked list.
+To force-enable anyway: pm enable %s  (shell)"
+    [mm_enable_success_fmt]="✅ %s re-enabled (removed from tracked list)"
+    [mm_enable_failed_fmt]="❌ Failed: %s"
+    [mm_disable_usage]="Usage: /minimal_mode disable <pkg>"
+    [mm_disable_essential_fmt]="❌ '%s' is in the essentials list (cellular/SMS/root/VPN).
+Disabling it can break the system. If you really want to:
+  pm disable-user --user 0 %s  (shell — at your own risk)"
+    [mm_disable_success_fmt]="❄ %s disabled + tracked
+Revert: /minimal_mode enable %s"
+    [mm_disable_failed_fmt]="❌ Failed: %s"
+    [mm_usage]="Usage: /minimal_mode <subcommand>
+
+Batch:
+  on / kill      — Force-stop everything outside the allowlist (transient)
+  persist        — on + disable SystemUI/Launcher/zte.web (tracked)
+  off / restore  — Re-enable the ones we disabled
+
+Inspection:
+  status         — General state
+  preview        — How many 'on' would kill (without running it)
+  list / keep    — The allowlist
+  disabled       — Tracked list (packages the bot disabled)
+
+Per package:
+  disable <pkg>  — Disable one package + add to tracked list
+  enable <pkg>   — Re-enable one package from the tracked list"
+
+    # ─── /perf_balanced ──────────────────────────────────────────────
+    [pb_header]="⚖️ Perf Balanced — current caps:"
+    [pb_policy_fmt]="  %s: cap=%d MHz  (hw_max=%d MHz)\n"
+    [pb_hint_on]="Performance hint: ON 🟢 → big cluster wakeable"
+    [pb_hint_off]="Performance hint: OFF ⚪ → big cluster offline
+   For /perf_balanced to have effect: /performance on + reboot"
+    [pb_hint_unread]="Performance hint: ? (unreadable)"
+    [pb_usage]="To apply: /perf_balanced [mhz]   (default 1800)
+To reset:  /perf_balanced reset"
+    [pb_reset_fmt]="✅ %d policy cap(s) reset (opened to hw max).
+Performance hint was not changed."
+    [pb_invalid_mhz_fmt]="❌ Invalid mhz: %s
+Usage: /perf_balanced [mhz|reset]"
+    [pb_too_low]="❌ Minimum 500 MHz"
+    [pb_too_high]="❌ Maximum 3000 MHz"
+    [pb_no_clusters]="❌ Could not apply to any cluster"
+    [pb_warn_hint_off]="
+
+⚠ Performance hint OFF — big cluster has been offline since boot.
+  For full benefit: /performance on → reboot → run this command again."
+    [pb_applied_fmt]="⚖️ Perf Balanced applied (%d cluster(s)):%s
+%s
+
+Cap resets on reboot (sysfs is RAM-only — zero risk)."
+
+    # ─── /update ──────────────────────────────────────────────────────
+    [update_header]="🔍 Module update check"
+    [update_remote_unread_fmt]="  %s: %s  ⚠ remote unreachable"
+    [update_parse_fail_fmt]="  %s: %s  ⚠ JSON parse error"
+    [update_outdated_fmt]="  📦 %s: %s → %s (vCode %d→%d) ⬆"
+    [update_uptodate_fmt]="  ✓ %s: %s (up to date)"
+    [update_none_defined]="No module has updateJson defined."
+    [update_all_current]="All modules are up to date."
+    [update_count_outdated_fmt]="%d module(s) can be updated.
+Update all: /update all
+One by one: /update <module-id>"
+    [update_all_start]="📥 Checking and installing all updates…"
+    [update_no_zipurl_fmt]="  %s: zipUrl missing, skipped"
+    [update_downloading_fmt]="  ⬇ Downloading %s %s…"
+    [update_installed_fmt]="  ✅ %s → %s"
+    [update_install_failed_fmt]="  ❌ %s install failed"
+    [update_download_failed_fmt]="  ❌ %s download failed"
+    [update_summary_fmt]="📊 Summary: %d checked, %d updated, %d failed"
+    [update_reboot_hint]="
+If binaries changed, reboot for full effect.
+If statusbot itself was updated, it restarts within 10 s (supervisor)."
+    [update_module_not_found_fmt]="❌ Module not found: %s
+For the list: /update"
+    [update_no_updatejson_fmt]="❌ %s has no updateJson defined"
+    [update_remote_unread_long_fmt]="❌ Remote unreachable: %s"
+    [update_already_current_fmt]="✓ %s already up to date (%s)"
+    [update_download_failed]="❌ Download failed"
+    [update_self_installed_fmt]="✅ statusbot %s installed, bot will restart in 5 s…"
+    [update_other_installed_fmt]="✅ %s %s installed
+If a binary changed, reboot is recommended."
+    [update_install_failed_long_fmt]="❌ Install failed:
+%s"
+
+    # ─── /tailscale ───────────────────────────────────────────────────
+    [ts_binary_missing]="❌ tailscale binaries not found.
+Searched paths:
+  /system/bin/{tailscale,tailscaled}
+  /data/adb/modules/tailscale-control/system/bin/
+  /data/adb/modules_update/tailscale-control/system/bin/
+Install the tailscale-control module."
+    [ts_status_on_fmt]="Tailscale: 🟢 ON
+PID: %s  (RSS: %d MB)
+IP:  %s
+%s
+
+Other commands: /tailscale {on|off|auth|ip|peers|logout|log}"
+    [ts_ip_pending]="(awaiting login)"
+    [ts_status_off_fmt]="Tailscale: 🔴 OFF
+%s"
+    [ts_hint_on]="To turn on: /tailscale on"
+    [ts_hint_auth_first]="First: /tailscale auth <key>   then: /tailscale on"
+    [ts_already_running]="Already running. /tailscale status"
+    [ts_daemon_failed_fmt]="❌ tailscaled didn't start. Last log:
+%s"
+    [ts_active_fmt]="✅ Tailscale active
+IP: %s
+Exit-node: advertised (approve from admin panel)
+Routing: adaptive (follows the current default route)"
+    [ts_login_required_fmt]="🔑 Login required:
+%s
+
+Open this in a browser; once approved, the device will auto-connect."
+    [ts_up_response_fmt]="⚠️ Up response:
+%s"
+    [ts_already_off]="Already off (orphan iptables cleaned up)"
+    [ts_stopped]="🔴 Tailscale stopped
+iptables rules removed
+(VPN was not touched)"
+    [ts_auth_usage]="Usage: /tailscale auth <tsauth-key>
+Tailscale admin > Settings > Keys > Generate
+Recommended: reusable + ephemeral"
+    [ts_auth_saved_fmt]="🔑 Auth key saved (%d bytes).
+Now: /tailscale on"
+    [ts_logout_done]="👋 Logout
+State + authkey wiped"
+    [ts_off_short]="Tailscale is off"
+    [ts_log_none]="No log yet"
+    [ts_log_header]="📝 tailscaled last 20 lines:"
+    [ts_usage]="Usage: /tailscale [on|off|status|auth|ip|peers|logout|log]"
+
     # ─── /performance ─────────────────────────────────────────────────
     [perf_status_on]="⚡ Performance Mode: ON 🟢
 To turn off: /performance off"
