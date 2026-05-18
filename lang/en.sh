@@ -165,6 +165,76 @@ Load guide:
   < %d.0 = headroom available
   > %d.0 = queue, slowdowns possible"
 
+    # ─── /speedtest ──────────────────────────────────────────────────
+    [st_usage]="Usage: /speedtest [PROVIDER] [SIZE] [loop [COUNT]]
+
+PROVIDER:
+  (empty)|cf   Cloudflare endpoint (single-stream, fast default)
+  ookla        Ookla Speedtest CLI (multi-stream, most accurate)
+  fast         fast.com (Netflix CDN)
+
+SIZE (cf mode only):
+  quick        10 MB DL
+  <mb>         5-200 MB DL
+  full         50 MB DL + 25 MB UL
+  (empty)      50 MB DL
+
+LOOP:
+  loop         infinite loop — each result arrives as a message
+  loop N       run N times
+  Stop: /iptal
+
+Examples:
+  /speedtest ookla
+  /speedtest cf 100 loop 5
+  /speedtest fast loop
+  /speedtest loop 3"
+    [st_cf_starting_fmt]="🚀 Cloudflare speedtest starting (%d MB DL%s)…"
+    [st_cf_starting_upload]=" + 25 MB UL"
+    [st_cf_download_failed]="❌ Download failed (curl error)"
+    [st_cf_upload_failed]="
+⬆ Upload:    failed"
+    [st_cf_upload_fmt]="
+⬆ Upload:    %s Mbit/s (%s MB / %ss)"
+    [st_cf_result_fmt]="📊 Cloudflare Speedtest
+
+⬇ Download:  %s Mbit/s (%s MB / %ss)%s
+🏓 Latency:   %s ms (TCP connect)
+🖥 CPU:        %s
+🌡 Temp:      %s
+
+Server: speed.cloudflare.com (single-stream)
+Multi-stream test: /speedtest ookla"
+    [st_ookla_downloading]="📥 First run: downloading Ookla CLI (~1.5 MB, ~5 s)…"
+    [st_ookla_download_failed]="❌ Couldn't download Ookla binary (network?)"
+    [st_ookla_extract_failed]="❌ Ookla tar extract failed"
+    [st_ookla_starting]="🚀 Ookla Speedtest starting (multi-stream, closest server)…"
+    [st_ookla_failed_fmt]="❌ Ookla failed:
+%s"
+    [st_ookla_result_fmt]="📊 Ookla Speedtest
+
+⬇ Download:  %s Mbit/s
+⬆ Upload:    %s Mbit/s
+🏓 Ping:      %s ms (jitter %s ms)
+🖥 Server:    %s (%s)
+🌐 ISP:       %s
+🔌 Interface: %s  ext_ip=%s%s
+🌡 Temp:      %s
+
+Multi-stream — industry standard, most accurate."
+    [st_fast_starting]="🚀 fast.com (Netflix CDN) speedtest starting…"
+    [st_fast_api_failed_fmt]="❌ fast.com API failed:
+%s"
+    [st_fast_download_failed]="❌ fast.com download failed"
+    [st_fast_result_fmt]="📊 fast.com Speedtest
+
+⬇ Download:  %s Mbit/s
+   (%s MB / %ss, %d stream)
+🖥 Server:    %s
+🌡 Temp:      %s
+
+Netflix CDN endpoint — Netflix-biased but reflects real speed."
+
     # ─── /minimal_mode ───────────────────────────────────────────────
     [mm_status_fmt]="📦 Minimal Mode
 

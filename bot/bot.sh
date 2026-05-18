@@ -2877,29 +2877,7 @@ cmd_speedtest() {
         cf|cloudflare)
             arg="$arg2" ;;  # fall through to CF, arg2 = size/modifier
         help|?)
-            echo "Kullanım: /speedtest [PROVIDER] [SIZE] [loop [COUNT]]
-
-PROVIDER:
-  (boş)|cf      Cloudflare endpoint (single-stream, hızlı default)
-  ookla         Ookla Speedtest CLI (multi-stream, en doğru)
-  fast          fast.com (Netflix CDN)
-
-SIZE (sadece cf modda):
-  quick         10 MB DL
-  <mb>          5-200 MB DL
-  full          50 MB DL + 25 MB UL
-  (boş)         50 MB DL
-
-LOOP:
-  loop          Sonsuz döngü — her sonuç mesaj olarak gelir
-  loop N        N kere çalıştır
-  Durdurmak için: /iptal
-
-Örnekler:
-  /speedtest ookla
-  /speedtest cf 100 loop 5
-  /speedtest fast loop
-  /speedtest loop 3"
+            echo "${MSG[st_usage]}"
             return ;;
     esac
 
@@ -2910,7 +2888,7 @@ LOOP:
         ""|down|download) size_mb=50 ;;
         full|both|up) size_mb=50; do_upload=1 ;;
         quick) size_mb=10 ;;
-        *[!0-9]*) echo "Kullanım: /speedtest help"; return ;;
+        *[!0-9]*) echo "${MSG[st_usage]}"; return ;;
         *)
             size_mb="$arg"
             [ "$size_mb" -lt 5 ] && size_mb=5
@@ -2918,7 +2896,11 @@ LOOP:
     esac
     local bytes=$((size_mb * 1024 * 1024))
 
-    [ "$SPEEDTEST_QUIET" != "1" ] && tg_send "$OWNER" "🚀 Cloudflare speedtest başlıyor (${size_mb} MB DL$([ $do_upload -eq 1 ] && echo " + 25 MB UL"))..." >/dev/null
+    if [ "$SPEEDTEST_QUIET" != "1" ]; then
+        local up_suffix=""
+        [ "$do_upload" = "1" ] && up_suffix="${MSG[st_cf_starting_upload]}"
+        tg_send "$OWNER" "$(printf "${MSG[st_cf_starting_fmt]}" "$size_mb" "$up_suffix")" >/dev/null
+    fi
 
     # Latency: time_connect = TCP handshake (RTT proxy, ICMP'siz)
     local connect_ms
@@ -2935,14 +2917,13 @@ LOOP:
         "https://speed.cloudflare.com/__down?bytes=$bytes" 2>/dev/null)
     set -- $dl_result
     local dl_size="$1" dl_bps="$2" dl_time="$3"
-    [ -z "$dl_bps" ] && { echo "❌ Download başarısız (curl error)"; return; }
+    [ -z "$dl_bps" ] && { echo "${MSG[st_cf_download_failed]}"; return; }
     local dl_mbps
     dl_mbps=$(awk "BEGIN {printf \"%.1f\", $dl_bps * 8 / 1000000}")
 
     local ul_section=""
     if [ "$do_upload" = "1" ]; then
         local ul_bytes=$((25 * 1024 * 1024))
-        # Generate junk with dd, pipe to curl
         local ul_result
         ul_result=$(dd if=/dev/zero bs=1M count=25 2>/dev/null | \
             "$CURL" -sS --cacert "$CA" --max-time 60 \
@@ -2956,11 +2937,9 @@ LOOP:
             local ul_size="$1" ul_bps="$2" ul_time="$3"
             local ul_mbps
             ul_mbps=$(awk "BEGIN {printf \"%.1f\", $ul_bps * 8 / 1000000}")
-            ul_section="
-⬆ Upload:    $ul_mbps Mbit/s ($(awk "BEGIN {printf \"%.1f\", $ul_size/1048576}") MB / ${ul_time}s)"
+            ul_section=$(printf "${MSG[st_cf_upload_fmt]}" "$ul_mbps" "$(awk "BEGIN {printf \"%.1f\", $ul_size/1048576}")" "$ul_time")
         else
-            ul_section="
-⬆ Upload:    başarısız"
+            ul_section="${MSG[st_cf_upload_failed]}"
         fi
     fi
 
@@ -2974,35 +2953,34 @@ LOOP:
         [ -z "$aff" ] && clusters="${clusters}$(basename "$p")=OFFLINE "
     done
 
-    echo "📊 Cloudflare Speedtest
-
-⬇ Download:  $dl_mbps Mbit/s ($(awk "BEGIN {printf \"%.1f\", $dl_size/1048576}") MB / ${dl_time}s)$ul_section
-🏓 Latency:   $connect_ms ms (TCP connect)
-🖥 CPU:        $clusters
-🌡 Sıcaklık:  $(fmt_temp)
-
-Sunucu: speed.cloudflare.com (single-stream)
-Multi-stream test: /speedtest ookla"
+    printf "${MSG[st_cf_result_fmt]}\n" \
+        "$dl_mbps" \
+        "$(awk "BEGIN {printf \"%.1f\", $dl_size/1048576}")" \
+        "$dl_time" \
+        "$ul_section" \
+        "$connect_ms" \
+        "$clusters" \
+        "$(fmt_temp)"
 }
 
 cmd_speedtest_ookla() {
     if [ ! -x "$OOKLA_BIN" ]; then
-        tg_send "$OWNER" "📥 İlk çalıştırma: Ookla CLI indiriliyor (~1.5 MB, ~5s)..." >/dev/null
+        tg_send "$OWNER" "${MSG[st_ookla_downloading]}" >/dev/null
         mkdir -p "$(dirname "$OOKLA_BIN")"
         local tgz=/data/statusbot/.ookla.tgz
         if ! "$CURL" -sSL --cacert "$CA" --max-time 60 -o "$tgz" "$OOKLA_URL"; then
-            echo "❌ Ookla binary indirilemedi (network?)"
+            echo "${MSG[st_ookla_download_failed]}"
             return
         fi
         if ! tar -xzf "$tgz" -C "$(dirname "$OOKLA_BIN")" speedtest 2>/dev/null; then
-            echo "❌ Ookla tar çıkartma başarısız"
+            echo "${MSG[st_ookla_extract_failed]}"
             rm -f "$tgz"
             return
         fi
         chmod 755 "$OOKLA_BIN"
         rm -f "$tgz"
     fi
-    [ "$SPEEDTEST_QUIET" != "1" ] && tg_send "$OWNER" "🚀 Ookla Speedtest başlıyor (multi-stream, en yakın sunucu)..." >/dev/null
+    [ "$SPEEDTEST_QUIET" != "1" ] && tg_send "$OWNER" "${MSG[st_ookla_starting]}" >/dev/null
     # HOME = writable dir for license cache, --ca-certificate = bundled CA bundle
     local ookla_home=/data/statusbot/bin/ookla_home
     mkdir -p "$ookla_home"
@@ -3015,8 +2993,7 @@ cmd_speedtest_ookla() {
     local result_line
     result_line=$(echo "$out" | grep -F '"type":"result"' | tail -1)
     if [ -z "$result_line" ]; then
-        echo "❌ Ookla başarısız:
-$(echo "$out" | head -c 400)"
+        tf st_ookla_failed_fmt "$(echo "$out" | head -c 400)"
         return
     fi
     local ping_ms dl_bps ul_bps server_name server_loc isp iface ext_ip is_vpn jitter
@@ -3037,39 +3014,29 @@ $(echo "$out" | head -c 400)"
     jitter_fmt=$(awk "BEGIN {printf \"%.1f\", $jitter}")
     local vpn_tag=""
     [ "$is_vpn" = "true" ] && vpn_tag=" 🛡 VPN"
-    echo "📊 Ookla Speedtest
-
-⬇ Download:  $dl_mbps Mbit/s
-⬆ Upload:    $ul_mbps Mbit/s
-🏓 Ping:      $ping_fmt ms (jitter $jitter_fmt ms)
-🖥 Sunucu:    $server_name ($server_loc)
-🌐 ISP:       $isp
-🔌 Interface: $iface  ext_ip=$ext_ip$vpn_tag
-🌡 Sıcaklık:  $(fmt_temp)
-
-Multi-stream — endüstri standardı, en doğru."
+    printf "${MSG[st_ookla_result_fmt]}\n" \
+        "$dl_mbps" "$ul_mbps" "$ping_fmt" "$jitter_fmt" \
+        "$server_name" "$server_loc" "$isp" \
+        "$iface" "$ext_ip" "$vpn_tag" \
+        "$(fmt_temp)"
 }
 
 cmd_speedtest_fast() {
-    [ "$SPEEDTEST_QUIET" != "1" ] && tg_send "$OWNER" "🚀 fast.com (Netflix CDN) speedtest başlıyor..." >/dev/null
-    # API → CDN URL'leri
+    [ "$SPEEDTEST_QUIET" != "1" ] && tg_send "$OWNER" "${MSG[st_fast_starting]}" >/dev/null
     local api_resp
     api_resp=$("$CURL" -sS --cacert "$CA" --max-time 10 \
         "https://api.fast.com/netflix/speedtest/v2?https=true&token=$FAST_API_TOKEN&urlCount=3" 2>/dev/null)
     local urls_file=/data/statusbot/.fast_urls
     echo "$api_resp" | "$JQ" -r '.targets[].url // empty' > "$urls_file" 2>/dev/null
     if [ ! -s "$urls_file" ]; then
-        echo "❌ fast.com API başarısız:
-$(echo "$api_resp" | head -c 300)"
+        tf st_fast_api_failed_fmt "$(echo "$api_resp" | head -c 300)"
         rm -f "$urls_file"
         return
     fi
-    # 3 URL'i ardışık indir, toplam byte/zaman hesapla
     local total_bytes=0 total_time=0 count=0 server="?"
     local url
     while IFS= read -r url; do
         [ -z "$url" ] && continue
-        # İlk URL'den hostname al (server bilgisi için)
         if [ "$count" = 0 ]; then
             server=$(echo "$url" | sed 's|https://||; s|/.*||' | head -c 60)
         fi
@@ -3085,19 +3052,18 @@ $(echo "$api_resp" | head -c 300)"
     done < "$urls_file"
     rm -f "$urls_file"
     if [ "$count" = 0 ] || [ "$total_bytes" = 0 ]; then
-        echo "❌ fast.com download başarısız"
+        echo "${MSG[st_fast_download_failed]}"
         return
     fi
     local mbps
     mbps=$(awk "BEGIN {printf \"%.1f\", $total_bytes * 8 / $total_time / 1000000}")
-    echo "📊 fast.com Speedtest
-
-⬇ Download:  $mbps Mbit/s
-   ($(awk "BEGIN {printf \"%.1f\", $total_bytes/1048576}") MB / ${total_time}s, $count stream)
-🖥 Sunucu:    $server
-🌡 Sıcaklık:  $(fmt_temp)
-
-Netflix CDN endpoint — Netflix kullanıcısı bias'lı ama gerçek hızı yansıtır."
+    printf "${MSG[st_fast_result_fmt]}\n" \
+        "$mbps" \
+        "$(awk "BEGIN {printf \"%.1f\", $total_bytes/1048576}")" \
+        "$total_time" \
+        "$count" \
+        "$server" \
+        "$(fmt_temp)"
 }
 
 cmd_ps() {

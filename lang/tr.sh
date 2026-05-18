@@ -155,6 +155,76 @@ Yük rehberi:
   < %d.0 = boşta kapasite var
   > %d.0 = kuyruk var, yavaşlamalar olabilir"
 
+    # ─── /speedtest ──────────────────────────────────────────────────
+    [st_usage]="Kullanım: /speedtest [PROVIDER] [SIZE] [loop [COUNT]]
+
+PROVIDER:
+  (boş)|cf      Cloudflare endpoint (single-stream, hızlı default)
+  ookla         Ookla Speedtest CLI (multi-stream, en doğru)
+  fast          fast.com (Netflix CDN)
+
+SIZE (sadece cf modda):
+  quick         10 MB DL
+  <mb>          5-200 MB DL
+  full          50 MB DL + 25 MB UL
+  (boş)         50 MB DL
+
+LOOP:
+  loop          Sonsuz döngü — her sonuç mesaj olarak gelir
+  loop N        N kere çalıştır
+  Durdurmak için: /iptal
+
+Örnekler:
+  /speedtest ookla
+  /speedtest cf 100 loop 5
+  /speedtest fast loop
+  /speedtest loop 3"
+    [st_cf_starting_fmt]="🚀 Cloudflare speedtest başlıyor (%d MB DL%s)…"
+    [st_cf_starting_upload]=" + 25 MB UL"
+    [st_cf_download_failed]="❌ Download başarısız (curl error)"
+    [st_cf_upload_failed]="
+⬆ Upload:    başarısız"
+    [st_cf_upload_fmt]="
+⬆ Upload:    %s Mbit/s (%s MB / %ss)"
+    [st_cf_result_fmt]="📊 Cloudflare Speedtest
+
+⬇ Download:  %s Mbit/s (%s MB / %ss)%s
+🏓 Latency:   %s ms (TCP connect)
+🖥 CPU:        %s
+🌡 Sıcaklık:  %s
+
+Sunucu: speed.cloudflare.com (single-stream)
+Multi-stream test: /speedtest ookla"
+    [st_ookla_downloading]="📥 İlk çalıştırma: Ookla CLI indiriliyor (~1.5 MB, ~5s)…"
+    [st_ookla_download_failed]="❌ Ookla binary indirilemedi (network?)"
+    [st_ookla_extract_failed]="❌ Ookla tar çıkartma başarısız"
+    [st_ookla_starting]="🚀 Ookla Speedtest başlıyor (multi-stream, en yakın sunucu)…"
+    [st_ookla_failed_fmt]="❌ Ookla başarısız:
+%s"
+    [st_ookla_result_fmt]="📊 Ookla Speedtest
+
+⬇ Download:  %s Mbit/s
+⬆ Upload:    %s Mbit/s
+🏓 Ping:      %s ms (jitter %s ms)
+🖥 Sunucu:    %s (%s)
+🌐 ISP:       %s
+🔌 Interface: %s  ext_ip=%s%s
+🌡 Sıcaklık:  %s
+
+Multi-stream — endüstri standardı, en doğru."
+    [st_fast_starting]="🚀 fast.com (Netflix CDN) speedtest başlıyor…"
+    [st_fast_api_failed_fmt]="❌ fast.com API başarısız:
+%s"
+    [st_fast_download_failed]="❌ fast.com download başarısız"
+    [st_fast_result_fmt]="📊 fast.com Speedtest
+
+⬇ Download:  %s Mbit/s
+   (%s MB / %ss, %d stream)
+🖥 Sunucu:    %s
+🌡 Sıcaklık:  %s
+
+Netflix CDN endpoint — Netflix kullanıcısı bias'lı ama gerçek hızı yansıtır."
+
     # ─── /minimal_mode ───────────────────────────────────────────────
     [mm_status_fmt]="📦 Minimal Mode
 
