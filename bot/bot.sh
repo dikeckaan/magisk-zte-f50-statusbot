@@ -1,7 +1,8 @@
-#!/system/bin/sh
-# Telegram status bot v2.1 - rich commands + /komut with cancel
+#!/system/bin/bash
+# Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.9.0"
+BOT_VERSION="v2.10.0"
+MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
 TOKEN_FILE="$DATADIR/token"
@@ -10,11 +11,32 @@ OFFSET_FILE="$DATADIR/offset"
 BOOT_FLAG="$DATADIR/boot_sent"
 PENDING_REBOOT="$DATADIR/pending_reboot"
 LOGFILE="$DATADIR/bot.log"
+LANG_FILE_PREF="$DATADIR/lang"
 
 CURL=/system/bin/curl
 JQ=/system/bin/jq
 CA=/system/etc/cacert.pem
 TG_API="https://api.telegram.org/bot"
+
+# ─── i18n loader ──────────────────────────────────────────────────────────
+# en.sh is sourced first (provides full fallback set). User's selected lang
+# (if any) is sourced after — its keys override en's, missing keys fall back.
+declare -gA MSG
+if [ -r "$MODDIR/lang/en.sh" ]; then
+    . "$MODDIR/lang/en.sh"
+fi
+USER_LANG="en"
+if [ -r "$LANG_FILE_PREF" ]; then
+    USER_LANG=$(cat "$LANG_FILE_PREF" 2>/dev/null | tr -d ' \r\n')
+fi
+if [ -n "$USER_LANG" ] && [ "$USER_LANG" != "en" ] && [ -r "$MODDIR/lang/${USER_LANG}.sh" ]; then
+    . "$MODDIR/lang/${USER_LANG}.sh"
+fi
+
+# Translate helper: t <key> → MSG[key] or, if missing, the key itself
+t() { echo "${MSG[$1]:-$1}"; }
+# Translate-format: tf <key> <args...> → printf MSG[key] with args
+tf() { local k=$1; shift; printf "${MSG[$k]:-$k}\n" "$@"; }
 
 # sendat binary for AT commands - prefer bin-utils, fall back to UFI-TOOLS
 SENDAT=""
@@ -38,10 +60,10 @@ log() {
 
 greeting() {
     h=$(date +%H)
-    if   [ "$h" -ge 5 ]  && [ "$h" -lt 11 ]; then echo "Günaydın"
-    elif [ "$h" -ge 11 ] && [ "$h" -lt 17 ]; then echo "Tünaydın"
-    elif [ "$h" -ge 17 ] && [ "$h" -lt 21 ]; then echo "İyi akşamlar"
-    else                                          echo "İyi geceler"
+    if   [ "$h" -ge 5 ]  && [ "$h" -lt 11 ]; then t greet_morning
+    elif [ "$h" -ge 11 ] && [ "$h" -lt 17 ]; then t greet_noon
+    elif [ "$h" -ge 17 ] && [ "$h" -lt 21 ]; then t greet_evening
+    else                                          t greet_night
     fi
 }
 
@@ -1730,6 +1752,44 @@ State + authkey silindi"
         *)
             echo "Kullanım: /tailscale [on|off|status|auth|ip|peers|logout|log]" ;;
     esac
+}
+
+# ─── /lang — switch UI language ──────────────────────────────────────────
+cmd_lang() {
+    local arg
+    arg=$(echo "$1" | awk '{print $1}' | tr -d ' \r\n')
+
+    # No argument: show current + available languages
+    if [ -z "$arg" ] || [ "$arg" = "status" ]; then
+        tf lang_current_fmt "$USER_LANG"
+        echo
+        t lang_available_header
+        local f
+        for f in "$MODDIR"/lang/*.sh; do
+            [ -f "$f" ] || continue
+            local code
+            code=$(basename "$f" .sh)
+            local marker=" "
+            [ "$code" = "$USER_LANG" ] && marker="✓"
+            echo "  $marker $code"
+        done
+        echo
+        t lang_usage
+        return
+    fi
+
+    # Validate the requested code (file must exist)
+    if [ ! -r "$MODDIR/lang/${arg}.sh" ]; then
+        tf lang_invalid_fmt "$arg"
+        return
+    fi
+
+    # Persist + restart bot for full reload
+    mkdir -p "$DATADIR"
+    printf "%s\n" "$arg" > "$LANG_FILE_PREF"
+    log "lang switched: $USER_LANG -> $arg"
+    tf lang_set_fmt "$arg"
+    ( sleep 3; pkill -f "$MODDIR/bot/bot.sh" ) >/dev/null 2>&1 &
 }
 
 # ─── /update — fetch latest module versions from GitHub updateJson ───────
@@ -3818,6 +3878,7 @@ dispatch() {
         # ─── tailscale ─────────────────────────────────────────────────
         /tailscale|/ts)                reply=$(cmd_tailscale "$args") ;;
         /update|/güncelle|/guncelle)   reply=$(cmd_update "$args") ;;
+        /lang|/dil|/language)          reply=$(cmd_lang "$args") ;;
         *)
             local lc=$(echo "$text" | tr '[:upper:]' '[:lower:]' | tr -d ' .,!?')
             case "$lc" in
@@ -3858,7 +3919,8 @@ log "Bot $BOT_VERSION starting"
 
 # Register bot commands with Telegram (once per version - cached marker)
 register_commands() {
-    local marker="$DATADIR/.cmds_registered_$BOT_VERSION"
+    # Marker scoped by version AND language — switching lang triggers re-register
+    local marker="$DATADIR/.cmds_registered_${BOT_VERSION}_${USER_LANG}"
     [ -f "$marker" ] && return 0
     local body
     body='{"commands":[
@@ -3928,7 +3990,8 @@ register_commands() {
         {"command":"perf_help","description":"CPU/Performance kılavuzu"},
         {"command":"minimal_mode","description":"Gereksiz servisleri dondur (~640 MB)"},
         {"command":"speedtest","description":"Cloudflare speed test - /speedtest [quick|<mb>|full]"},
-        {"command":"update","description":"Modülleri GitHub uzerinden guncelle - /update [all|<id>]"}
+        {"command":"update","description":"Modülleri GitHub uzerinden guncelle - /update [all|<id>]"},
+        {"command":"lang","description":"Bot dilini degistir - /lang [code]"}
     ]}'
     local resp
     resp=$("$CURL" -sS --cacert "$CA" --max-time 10 \
@@ -3948,9 +4011,8 @@ register_commands &
 
 # Boot greeting (once per boot)
 if [ ! -f "$BOOT_FLAG" ]; then
-    msg="$(greeting), ben ayaktayım 🤖
-$(getprop ro.product.model) — uptime: $(fmt_uptime)
-Komutlar için /help"
+    msg=$(printf "${MSG[boot_greeting_fmt]}" \
+        "$(greeting)" "$(getprop ro.product.model)" "$(fmt_uptime)")
     tg_send "$OWNER" "$msg" >/dev/null
     log "Boot greeting sent"
     touch "$BOOT_FLAG"

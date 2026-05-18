@@ -25,11 +25,25 @@ done
 # Small warm-up to let network come up (cloudflared learned the lesson)
 sleep 15
 
+# Locate bash — bot needs it for associative arrays (i18n) and indirect
+# expansion. bin-utils v1.2.0+ ships bash at /system/bin/bash. Before that
+# bash is staged at /data/adb/modules_update/bin-utils/system/bin/bash.
+BASH_BIN=""
+for p in /system/bin/bash \
+         /data/adb/modules/bin-utils/system/bin/bash \
+         /data/adb/modules_update/bin-utils/system/bin/bash; do
+    [ -x "$p" ] && BASH_BIN="$p" && break
+done
+if [ -z "$BASH_BIN" ]; then
+    echo "[$(date)] FATAL: bash not found. Install/update bin-utils to v1.2.0+." >> "$LOG"
+    exit 1
+fi
+
 # Supervisor loop - restart bot if it crashes
 (
     while true; do
-        echo "[$(date)] starting bot.sh" >> "$LOG"
-        sh "$BOT" >> "$LOG" 2>&1
+        echo "[$(date)] starting bot.sh (interp: $BASH_BIN)" >> "$LOG"
+        "$BASH_BIN" "$BOT" >> "$LOG" 2>&1
         rc=$?
         echo "[$(date)] bot.sh exited rc=$rc, restarting in 10s" >> "$LOG"
         # Rotate service log if huge
