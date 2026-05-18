@@ -84,7 +84,7 @@ tg_send() {
 
 tg_send_with_cancel() {
     # $1 chat_id, $2 text, $3 task_id (for callback_data)
-    local kb="{\"inline_keyboard\":[[{\"text\":\"❌ İptal\",\"callback_data\":\"cancel:$3\"}]]}"
+    local kb="{\"inline_keyboard\":[[{\"text\":\"${MSG[btn_cancel]}\",\"callback_data\":\"cancel:$3\"}]]}"
     "$CURL" -sS --cacert "$CA" --max-time 15 \
         "${TG_API}${TOKEN}/sendMessage" \
         -d "chat_id=$1" \
@@ -95,7 +95,7 @@ tg_send_with_cancel() {
 
 tg_send_with_reboot() {
     # $1 chat_id, $2 text
-    local kb='{"inline_keyboard":[[{"text":"🔁 Şimdi Yeniden Başlat","callback_data":"reboot_now"}]]}'
+    local kb='{"inline_keyboard":[[{"text":"${MSG[btn_reboot_now]}","callback_data":"reboot_now"}]]}'
     "$CURL" -sS --cacert "$CA" --max-time 15 \
         "${TG_API}${TOKEN}/sendMessage" \
         -d "chat_id=$1" \
@@ -223,7 +223,7 @@ fmt_local_ips() {
     ip -4 -o addr 2>/dev/null | awk '$2!="lo" {print $2, $4}' | while read iface ip; do
         local role=$(iface_role "$iface")
         local marker=""
-        [ "$iface" = "$def_iface" ] && marker=" ⬅ varsayılan çıkış"
+        [ "$iface" = "$def_iface" ] && marker="${MSG[iface_default_exit]}"
         printf "%s  %s  (%s)%s\n" "$role" "$ip" "$iface" "$marker"
     done
 }
@@ -239,7 +239,7 @@ fmt_operator() {
 # ─── UFI sendat helpers ───────────────────────────────────────────────────
 at_cmd() {
     # $1 = AT command, $2 = slot (default 0). Outputs cleaned response.
-    [ -x "$SENDAT" ] || { echo "(sendat yok - UFI-TOOLS yüklü değil)"; return 1; }
+    [ -x "$SENDAT" ] || { echo "${MSG[no_sendat_short]}"; return 1; }
     local slot="${2:-0}"
     "$SENDAT" -c "$1" -n "$slot" 2>/dev/null | tr -d '\r' | sed 's/OK$//' | head -c 400
 }
@@ -254,11 +254,11 @@ csq_to_dbm() {
 
 csq_label() {
     local csq="$1"
-    if   [ "$csq" -ge 20 ]; then echo "🟢 Mükemmel"
-    elif [ "$csq" -ge 15 ]; then echo "🟢 İyi"
-    elif [ "$csq" -ge 10 ]; then echo "🟡 Orta"
-    elif [ "$csq" -ge 2 ];  then echo "🟠 Zayıf"
-    else                         echo "🔴 Çok zayıf"
+    if   [ "$csq" -ge 20 ]; then echo "${MSG[csq_excellent]}"
+    elif [ "$csq" -ge 15 ]; then echo "${MSG[csq_good]}"
+    elif [ "$csq" -ge 10 ]; then echo "${MSG[csq_moderate]}"
+    elif [ "$csq" -ge 2 ];  then echo "${MSG[csq_weak]}"
+    else                         echo "${MSG[csq_very_weak]}"
     fi
 }
 
@@ -284,7 +284,7 @@ fmt_signal() {
     if [ -n "$rsrp" ] && [ "$rsrp" != "255" ]; then
         # RSRP dBm = rsrp - 141 + 1 ... actually: -141 to -44 maps to 0-97. RSRP_dBm = rsrp - 141
         echo ""
-        echo "LTE Detayları:"
+        echo "${MSG[lte_details]}"
         echo "  RSRP: $((rsrp - 141)) dBm"
         if [ -n "$rsrq" ] && [ "$rsrq" != "255" ]; then
             # RSRQ dB = (rsrq - 40) / 2 ... actually: rsrq is 0-34 mapping -19.5 to -3.0 dB
@@ -349,7 +349,7 @@ fmt_traffic() {
         echo ""
         echo "$role ($iface)"
         echo "  ↓ $(fmt_bytes "$rx") indirilen"
-        echo "  ↑ $(fmt_bytes "$tx") yüklenen"
+        printf "${MSG[iface_traffic_up_fmt]}\n" "$(fmt_bytes "$tx")"
     done
 }
 
@@ -754,71 +754,68 @@ cmd_ls() {
 
 cmd_cat() {
     local p="$1"
-    [ -z "$p" ] && { echo "Kullanım: /cat <dosya>"; return; }
-    [ ! -f "$p" ] && { echo "❌ Dosya yok: $p"; return; }
+    [ -z "$p" ] && { echo "${MSG[cat_usage]}"; return; }
+    [ ! -f "$p" ] && { tf cat_no_file_fmt "$p"; return; }
     local size
     size=$(stat -c %s "$p" 2>/dev/null || echo 0)
     if [ "$size" -gt 4000 ]; then
-        echo "📄 $p ($size byte — ilk 4000)
-$(head -c 4000 "$p")
-... (kalan: /file $p ile çek)"
+        printf "${MSG[cat_file_header_fmt]}\n%s\n" "$p" "$size" "$(head -c 4000 "$p")"
+        printf "${MSG[cat_truncated_hint_fmt]}\n" "$p"
     else
-        echo "📄 $p
-$(cat "$p")"
+        printf "${MSG[cat_short_header_fmt]}\n%s\n" "$p" "$(cat "$p")"
     fi
 }
 
 cmd_df() {
-    echo "💿 Disk Kullanımı:"
+    echo "${MSG[df_header]}"
     df -h 2>/dev/null | awk 'NR==1 || /\/data|\/system|\/cache|\/dev$|\/tmp/ {print}'
 }
 
 cmd_du() {
     local p="${1:-/data}"
-    [ ! -d "$p" ] && { echo "❌ Dizin yok: $p"; return; }
-    echo "📊 $p alt dizin boyutları:"
+    [ ! -d "$p" ] && { tf du_no_dir_fmt "$p"; return; }
+    tf du_header_fmt "$p"
     du -sh "$p"/* 2>/dev/null | sort -hr | head -15
 }
 
 # ─── network inspection ───────────────────────────────────────────────────
 cmd_connections() {
-    echo "🔗 Established TCP bağlantıları (top 30):"
+    echo "${MSG[conn_header]}"
     netstat -tn 2>/dev/null | awk '$NF=="ESTABLISHED" {print $4 "  ↔  " $5}' | sort -u | head -30
 }
 
 cmd_listening() {
-    echo "👂 Dinleyen TCP portları:"
+    echo "${MSG[listen_header]}"
     netstat -tlnp 2>/dev/null | awk '/LISTEN/ {printf "  %-22s  %s\n", $4, $7}' | sort -u | head -30
 }
 
 cmd_dns() {
-    echo "🌐 DNS Yapılandırması:"
+    echo "${MSG[dns_header]}"
     for f in /etc/resolv.conf /system/etc/resolv.conf; do
         [ -r "$f" ] && echo "$f:" && cat "$f" 2>/dev/null
     done
     echo
-    echo "Active DNS (Android props):"
+    echo "${MSG[dns_active]}"
     getprop | grep -iE "^\[net.dns" | head -5
 }
 
 cmd_dhcp() {
-    echo "📋 DHCP / Bağlı Cihazlar"
+    echo "${MSG[dhcp_header]}"
     echo
     # Identify DHCP server (Android tethering uses dnsmasq with no lease file — stateless)
     local dnsmasq_pid
     dnsmasq_pid=$(pgrep -f "dnsmasq.*dhcp" 2>/dev/null | head -1)
     if [ -n "$dnsmasq_pid" ]; then
-        echo "DHCP sunucusu: dnsmasq (PID $dnsmasq_pid, stateless)"
+        tf dhcp_server_fmt "$dnsmasq_pid"
     else
-        echo "DHCP sunucusu: yok (hotspot kapalı olabilir)"
+        echo "${MSG[dhcp_no_server]}"
     fi
     # Bridge gateway IP
     local gw
     gw=$(ip -4 addr show br0 2>/dev/null | awk '/inet /{print $2; exit}')
-    [ -n "$gw" ] && echo "Bridge:       $gw"
+    [ -n "$gw" ] && tf dhcp_bridge_fmt "$gw"
     echo
-    echo "👥 Aktif istemciler (ip neigh dev br0):"
-    # Single-pass: ip neigh → IP MAC STATE
+    echo "${MSG[dhcp_clients_header]}"
     local cnt=0
     local line
     ip neigh show dev br0 2>/dev/null | awk '$1!~/^fe80/ && NF>=4 {
@@ -827,14 +824,14 @@ cmd_dhcp() {
         if (mac != "") printf "  %-15s  %-17s  %s\n", ip, mac, state
     }' | head -20
     cnt=$(ip neigh show dev br0 2>/dev/null | awk '$1!~/^fe80/ && /lladdr/' | wc -l)
-    [ "$cnt" -eq 0 ] && echo "  (yok)"
+    [ "$cnt" -eq 0 ] && echo "${MSG[dhcp_none]}"
     echo
-    echo "Toplam: $cnt cihaz"
+    tf dhcp_total_fmt "$cnt"
 }
 
 # ─── power / kernel ───────────────────────────────────────────────────────
 cmd_cpu_freq() {
-    echo "⚡ CPU Frekansları"
+    echo "${MSG[cpufreq_header]}"
     local i=0
     for d in /sys/devices/system/cpu/cpu[0-9]*/cpufreq; do
         [ -d "$d" ] || continue
@@ -844,7 +841,7 @@ cmd_cpu_freq() {
         max=$(cat "$d/scaling_max_freq" 2>/dev/null)
         gov=$(cat "$d/scaling_governor" 2>/dev/null)
         [ -z "$cur" ] && continue
-        printf "  CPU%d: %d MHz (gov=%s, %d-%d MHz)\n" "$i" "$((cur/1000))" "$gov" "$((min/1000))" "$((max/1000))"
+        printf "${MSG[cpufreq_line_fmt]}" "$i" "$((cur/1000))" "$gov" "$((min/1000))" "$((max/1000))"
         i=$((i+1))
     done
 }
@@ -852,20 +849,19 @@ cmd_cpu_freq() {
 cmd_cpu_governor() {
     local arg="$1"
     if [ -z "$arg" ] || [ "$arg" = "status" ]; then
-        echo "⚙️ CPU governor durumu:"
+        echo "${MSG[gov_status_header]}"
         local i
         for i in 0 1 2 3 4 5 6 7; do
             local d=/sys/devices/system/cpu/cpu$i
             [ -d "$d" ] || continue
             local online state gov
             online=$(cat "$d/online" 2>/dev/null)
-            [ -z "$online" ] && online=1   # cpu0 has no 'online' file (always on)
+            [ -z "$online" ] && online=1
             if [ "$online" = "1" ]; then
-                state="🟢 online "
+                state="${MSG[gov_online_label]}"
                 gov=$(cat "$d/cpufreq/scaling_governor" 2>/dev/null)
             else
-                state="⚫ offline"
-                # Use policy file to get inherited governor (last value)
+                state="${MSG[gov_offline_label]}"
                 local pol
                 for pol in /sys/devices/system/cpu/cpufreq/policy*; do
                     grep -qw "$i" "$pol/related_cpus" 2>/dev/null \
@@ -873,11 +869,11 @@ cmd_cpu_governor() {
                         && break
                 done
             fi
-            printf "  cpu%d  %s  %s\n" "$i" "$state" "$gov"
+            printf "${MSG[gov_line_fmt]}" "$i" "$state" "$gov"
         done
         echo
-        echo "Mevcut: $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors 2>/dev/null)"
-        echo "Değiştirmek: /cpu_governor <ad>  (reboot'ta sıfırlanır)"
+        tf gov_available_fmt "$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors 2>/dev/null)"
+        echo "${MSG[gov_change_hint]}"
         return
     fi
     # Apply at policy level. For offline policies, briefly online one CPU to
@@ -910,22 +906,23 @@ cmd_cpu_governor() {
         fi
     done
     if [ "$applied" -gt 0 ]; then
-        local msg="✅ $applied cluster → $arg"
+        local msg
+        msg=$(printf "${MSG[gov_applied_fmt]}" "$applied" "$arg")
         [ -n "$woken" ] && msg="$msg
-(geçici online edildi:$woken — Android tekrar offline'a alacak)"
+$(printf "${MSG[gov_woken_fmt]}" "$woken")"
         [ "$skipped" -gt 0 ] && msg="$msg
-⚠ $skipped cluster atlandı (yetki/desteklenmeyen)"
+$(printf "${MSG[gov_skipped_fmt]}" "$skipped")"
         echo "$msg"
     else
-        echo "❌ Hiçbir cluster güncellenmedi (geçersiz governor: $arg?)"
+        tf gov_no_change_fmt "$arg"
     fi
 }
 
 cmd_wakelock() {
-    echo "💡 Aktif Wakelock'lar:"
+    echo "${MSG[wakelock_header]}"
     local src=/sys/kernel/debug/wakeup_sources
     [ ! -r "$src" ] && src=/sys/kernel/wakeup_sources
-    [ ! -r "$src" ] && { echo "  wakeup_sources okunamadı"; return; }
+    [ ! -r "$src" ] && { echo "${MSG[wakelock_unread]}"; return; }
     # Show entries with active_count or non-zero active_since
     awk 'NR==1 {next} $0~/^name/ {next}
     {
@@ -940,40 +937,48 @@ cmd_wakelock() {
 # ─── app management ───────────────────────────────────────────────────────
 cmd_freeze() {
     local pkg="$1"
-    [ -z "$pkg" ] && { echo "Kullanım: /freeze <paket>"; return; }
+    [ -z "$pkg" ] && { echo "${MSG[freeze_usage]}"; return; }
     local out
     out=$(pm disable-user --user 0 "$pkg" 2>&1)
     case "$out" in
-        *new\ state:\ disabled*) echo "❄️ $pkg donduruldu" ;;
-        *) echo "❌ Başarısız: $out" ;;
+        *new\ state:\ disabled*) tf freeze_done_fmt "$pkg" ;;
+        *) tf freeze_failed_fmt "$out" ;;
     esac
 }
 
 cmd_unfreeze() {
     local pkg="$1"
-    [ -z "$pkg" ] && { echo "Kullanım: /unfreeze <paket>"; return; }
+    [ -z "$pkg" ] && { echo "${MSG[unfreeze_usage]}"; return; }
     local out
     out=$(pm enable "$pkg" 2>&1)
     case "$out" in
-        *new\ state:\ enabled*) echo "✅ $pkg yeniden aktif" ;;
-        *) echo "❌ Başarısız: $out" ;;
+        *new\ state:\ enabled*) tf unfreeze_done_fmt "$pkg" ;;
+        *) tf freeze_failed_fmt "$out" ;;
     esac
 }
 
 cmd_installed() {
     local arg="$1"
     case "$arg" in
-        ""|3rd|user) echo "📦 3rd-party paketler (top 30):"; pm list packages -3 2>/dev/null | sed 's/^package://' | head -30 ;;
-        disabled|frozen) echo "❄️ Devre dışı paketler:"; pm list packages -d 2>/dev/null | sed 's/^package://' ;;
-        system) echo "🤖 Sistem paketleri (top 50):"; pm list packages -s 2>/dev/null | sed 's/^package://' | head -50 ;;
-        all) echo "📦 TÜM paketler ($(pm list packages 2>/dev/null | wc -l) toplam, top 50):"; pm list packages 2>/dev/null | sed 's/^package://' | head -50 ;;
-        *) echo "Kullanım: /installed [3rd|disabled|system|all]" ;;
+        ""|3rd|user)
+            echo "${MSG[installed_user_header]}"
+            pm list packages -3 2>/dev/null | sed 's/^package://' | head -30 ;;
+        disabled|frozen)
+            echo "${MSG[installed_disabled_header]}"
+            pm list packages -d 2>/dev/null | sed 's/^package://' ;;
+        system)
+            echo "${MSG[installed_system_header]}"
+            pm list packages -s 2>/dev/null | sed 's/^package://' | head -50 ;;
+        all)
+            tf installed_all_header_fmt "$(pm list packages 2>/dev/null | wc -l)"
+            pm list packages 2>/dev/null | sed 's/^package://' | head -50 ;;
+        *) echo "${MSG[installed_usage]}" ;;
     esac
 }
 
 # ─── security / audit ─────────────────────────────────────────────────────
 cmd_who() {
-    echo "👥 Aktif SSH/ADB Oturumları:"
+    echo "${MSG[who_header]}"
     echo
     echo "SSH:"
     netstat -tn 2>/dev/null | awk '$4~/:22222$/ && $NF=="ESTABLISHED" {print "  " $5}'
@@ -983,10 +988,10 @@ cmd_who() {
 }
 
 cmd_last_boot() {
-    echo "🔄 Boot Geçmişi:"
-    echo "Şu anki: up $(awk '{printf "%dh %02dm", $1/3600, ($1%3600)/60}' /proc/uptime)"
+    echo "${MSG[last_boot_header]}"
+    tf last_boot_current_fmt "$(awk '{printf "%dh %02dm", $1/3600, ($1%3600)/60}' /proc/uptime)"
     echo
-    echo "Önceki boot'lar (logcat'ten):"
+    echo "${MSG[last_boot_prev]}"
     logcat -d -b system 2>/dev/null | grep -iE "boot_completed|sys.boot_completed" | tail -3
 }
 
@@ -994,7 +999,7 @@ cmd_log() {
     local n="${1:-20}"
     case "$n" in *[!0-9]*) n=20 ;; esac
     [ "$n" -gt 200 ] && n=200
-    echo "📝 Bot log son $n satır:"
+    tf log_header_fmt "$n"
     echo "─────────"
     tail -n "$n" "$LOGFILE" 2>/dev/null
 }
@@ -1006,12 +1011,12 @@ cmd_dump_sms() {
         --sort 'date DESC' 2>/dev/null > "$out"
     local cnt=$(wc -l < "$out")
     if [ "$cnt" -eq 0 ]; then
-        echo "📭 SMS yok"
+        echo "${MSG[dump_sms_none]}"
         rm -f "$out"
         return
     fi
-    tg_send "$1" "📨 SMS dump ($cnt mesaj) gönderiliyor..." >/dev/null
-    tg_send_document "$1" "$out" "📨 SMS Dump ($cnt mesaj)" >/dev/null
+    tg_send "$1" "$(printf "${MSG[dump_sms_count_fmt]}" "$cnt")" >/dev/null
+    tg_send_document "$1" "$out" "$(printf "${MSG[dump_sms_caption_fmt]}" "$cnt")" >/dev/null
     rm -f "$out"
 }
 
@@ -1026,22 +1031,12 @@ cmd_bot_stats() {
     err_count=$(grep -ciE "error|fail|bad api" "$LOGFILE" 2>/dev/null || echo 0)
     local log_size
     log_size=$(stat -c %s "$LOGFILE" 2>/dev/null || echo 0)
-    cat <<EOF
-🤖 Bot İstatistikleri
-
-Version:    $BOT_VERSION
-Uptime:     ${up_h}sa ${up_m}dk
-Mesaj:      $msg_count
-Hata sat.:  $err_count
-Log size:   $((log_size/1024)) KB
-PID:        $$
-EOF
+    printf "${MSG[bot_stats_fmt]}\n" "$BOT_VERSION" "$up_h" "$up_m" "$msg_count" "$err_count" "$((log_size/1024))" "$$"
 }
 
 cmd_restart_bot() {
-    echo "🔄 Bot yeniden başlatılıyor..."
+    echo "${MSG[bot_restart_msg]}"
     log "Bot restart requested via command"
-    # Spawn detached killer so we can return reply first
     ( sleep 2; kill $(cat "$DATADIR/bot.pid" 2>/dev/null) ) &
 }
 
@@ -2539,7 +2534,7 @@ cmd_sms_list() {
         --sort 'date DESC' 2>/dev/null)
 
     if [ -z "$raw" ]; then
-        echo "💬 SMS okunamadı (içerik sağlayıcı erişilemedi)"
+        echo "${MSG[sms_unread]}"
         return
     fi
 
@@ -2566,16 +2561,16 @@ cmd_sms_list() {
 cmd_sms_count() {
     local raw=$(content query --uri content://sms/inbox --projection _id 2>/dev/null)
     local total=$(echo "$raw" | grep -c "Row:")
-    echo "💬 Inbox: $total SMS
-Listeyi gör: /sms_list  (varsayılan 10, /sms_list 20 gibi)"
+    echo "💬 Inbox: $total SMS"
+    echo "${MSG[sms_count_hint]}"
 }
 
 cmd_cellinfo() {
     if [ ! -x "$SENDAT" ]; then
-        echo "❌ UFI-TOOLS (sendat) bulunamadı. Cellular bilgi alınamaz."
+        echo "${MSG[cellinfo_no_sendat]}"
         return
     fi
-    echo "📡 Cellular Bilgileri"
+    echo "📡 Cellular Info"
     echo ""
     local op_raw=$(at_cmd "AT+COPS?")
     local creg=$(at_cmd "AT+CREG?")
@@ -2596,14 +2591,14 @@ cmd_cellinfo() {
         16) nettype_label="5G SA" ;;
         *) nettype_label="$nettype" ;;
     esac
-    echo "Operatör: $(fmt_operator)"
+    tf cellinfo_operator_fmt "$(fmt_operator)"
     [ -n "$mccmnc" ] && echo "MCC/MNC: $mccmnc"
-    [ -n "$nettype_label" ] && echo "Şebeke: $nettype_label"
+    [ -n "$nettype_label" ] && tf cellinfo_net_fmt "$nettype_label"
 
     # Phone number
     local phone=$(echo "$cnum" | sed -n 's/.*"My Number","\([+0-9]*\)".*/\1/p')
     [ -z "$phone" ] && phone=$(echo "$cnum" | sed -n 's/.*"\([+0-9]*\)".*/\1/p')
-    [ -n "$phone" ] && echo "Telefon: $phone"
+    [ -n "$phone" ] && echo "Phone: $phone"
 
     # IDs
     local imei_clean=$(echo "$imei" | sed 's/[^0-9]//g')
@@ -2616,12 +2611,12 @@ cmd_ip() {
     echo "🌐 Public IP:"
     echo "  $(fmt_public_ip)"
     echo
-    echo "🏠 Local arayüzler:"
+    echo "${MSG[ip_local_header]}"
     fmt_local_ips
 }
 
 cmd_modules() {
-    echo "🧩 Magisk Modülleri:"
+    echo "${MSG[modules_header]}"
     for d in /data/adb/modules/*/; do
         [ -d "$d" ] || continue
         name=$(basename "$d")
@@ -2643,17 +2638,17 @@ cmd_tunnel() {
             up=$((now - stime))
             echo "✅ Cloudflared aktif (PID $pid, $((up/60))dk uptime)"
         else
-            echo "✅ Cloudflared aktif"
+            echo "✅ Cloudflared active"
         fi
         tail_line=$(tail -1 /data/cloudflared/cloudflared.log 2>/dev/null | head -c 200)
-        [ -n "$tail_line" ] && echo "Son log: $tail_line"
+        [ -n "$tail_line" ] && echo "Last log: $tail_line"
     else
-        echo "❌ Cloudflared kapalı"
+        echo "${MSG[tunnel_off]}"
     fi
 }
 
 cmd_clients() {
-    echo "📶 ARP/Komşu Tablosu:"
+    echo "${MSG[clients_header]}"
     local count=0
     if [ -r /proc/net/arp ]; then
         while IFS= read -r line; do
@@ -2666,14 +2661,14 @@ cmd_clients() {
             count=$((count+1))
         done < /proc/net/arp
     fi
-    [ "$count" -eq 0 ] && echo "  (aktif kayıt yok)"
+    [ "$count" -eq 0 ] && echo "${MSG[clients_none]}"
 }
 
 cmd_ping() {
     local host="$1"
-    [ -z "$host" ] && { echo "Kullanım: /ping <host>"; return; }
+    [ -z "$host" ] && { echo "${MSG[ping_usage]}"; return; }
     case "$host" in
-        *[!a-zA-Z0-9.-]*) echo "❌ Geçersiz host"; return ;;
+        *[!a-zA-Z0-9.-]*) echo "${MSG[ping_invalid_host]}"; return ;;
     esac
     echo "🏓 ping $host:"
     ping -c 3 -W 2 "$host" 2>&1 | tail -5
@@ -2693,7 +2688,7 @@ speedtest_start_loop() {
         local oldpid
         oldpid=$(cat "$SPEEDTEST_LOOP_PID" 2>/dev/null)
         if [ -n "$oldpid" ] && kill -0 "$oldpid" 2>/dev/null; then
-            echo "⚠ Zaten loop çalışıyor (PID $oldpid). Önce: /iptal"
+            tf loop_already_running_fmt "$oldpid"
             return
         fi
         rm -f "$SPEEDTEST_LOOP_PID"
@@ -2701,9 +2696,6 @@ speedtest_start_loop() {
     local label="${cleaned:-cf}"
     local count_label="∞"
     [ "$count" != "0" ] && count_label="$count"
-    # Background subshell — write its stdio to a log file (not /dev/null) so
-    # any unexpected error is debuggable. The log file IS a separate FD, so
-    # the parent's $() pipe still closes normally for the dispatcher.
     local bg_log="$DATADIR/speedtest_loop.log"
     echo "[$(date)] loop start: cleaned=$cleaned count=$count" > "$bg_log"
     (
@@ -2717,12 +2709,11 @@ speedtest_start_loop() {
             rc=$?
             [ -f "$SPEEDTEST_LOOP_PID" ] || break
             if [ -z "$res" ]; then
-                tg_send "$OWNER" "⚠ Loop #$i: boş sonuç (rc=$rc), durduruluyor" >/dev/null
+                tg_send "$OWNER" "$(printf "${MSG[loop_empty_result_fmt]}" "$i" "$rc")" >/dev/null
                 rm -f "$SPEEDTEST_LOOP_PID"
                 break
             fi
-            tg_send "$OWNER" "🔁 Loop #$i ($label)
-$res" >/dev/null
+            tg_send "$OWNER" "$(printf "${MSG[loop_iter_fmt]}" "$i" "$label" "$res")" >/dev/null
             log "speedtest loop: iter=$i provider=$label rc=$rc"
             i=$((i+1))
             [ -f "$SPEEDTEST_LOOP_PID" ] || break
@@ -2730,16 +2721,11 @@ $res" >/dev/null
         done
         if [ -f "$SPEEDTEST_LOOP_PID" ]; then
             rm -f "$SPEEDTEST_LOOP_PID"
-            tg_send "$OWNER" "✅ Speedtest loop bitti ($((i-1)) iter, $label)" >/dev/null
+            tg_send "$OWNER" "$(printf "${MSG[loop_done_fmt]}" "$((i-1))" "$label")" >/dev/null
         fi
     ) </dev/null >>"$bg_log" 2>&1 &
     echo $! > "$SPEEDTEST_LOOP_PID"
-    echo "🔁 Loop başlatıldı
-provider: $label
-adet: $count_label
-İlk sonuç 15-30 sn içinde gelir.
-
-Durdurmak: /iptal"
+    tf loop_started_fmt "$label" "$count_label"
 }
 
 cmd_speedtest() {
@@ -3032,9 +3018,7 @@ cmd_komut() {
     local cmd="$3"
 
     if [ -z "$cmd" ]; then
-        tg_send "$chat_id" "Kullanım: /komut <shell komutu>
-Örnek: /komut ls /data
-Maks $((KOMUT_TIMEOUT))sn çalışır, üzeri otomatik iptal." "$user_msg_id" >/dev/null
+        tg_send "$chat_id" "$(printf "${MSG[komut_usage_fmt]}" "$KOMUT_TIMEOUT")" "$user_msg_id" >/dev/null
         return
     fi
 
@@ -3048,8 +3032,7 @@ Maks $((KOMUT_TIMEOUT))sn çalışır, üzeri otomatik iptal." "$user_msg_id" >/
     : > "$outfile"
     echo "$cmd" > "$cmdfile"
 
-    local resp=$(tg_send_with_cancel "$chat_id" "🔄 Çalışıyor:
-\$ $cmd" "$task_id")
+    local resp=$(tg_send_with_cancel "$chat_id" "$(printf "${MSG[komut_running_fmt]}" "$cmd")" "$task_id")
     local bot_msg_id=$(echo "$resp" | "$JQ" -r '.result.message_id // empty')
 
     if [ -z "$bot_msg_id" ]; then
@@ -3359,7 +3342,7 @@ dispatch() {
         /ramclean|/ramtemizle|/clean)  reply=$(cmd_ramclean "$args") ;;
         /at)                           reply=$(cmd_at "$args") ;;
         /traffic|/veri|/data)          reply=$(fmt_traffic) ;;
-        /operator|/operatör)           reply="📡 $(fmt_operator)" ;;
+        /operator|/operatör)           reply=$(printf "${MSG[op_status_fmt]}" "$(fmt_operator)") ;;
         /modules|/moduller)            reply=$(cmd_modules) ;;
         /perf_balanced|/balanced|/perfbalanced)
             reply=$(cmd_perf_balanced "$args") ;;
@@ -3418,7 +3401,7 @@ dispatch() {
         /bot_stats|/botstats|/stats)   reply=$(cmd_bot_stats) ;;
         /restart_bot|/restartbot)
             cmd_restart_bot
-            tg_send "$chat_id" "🔄 Bot 2 sn içinde restart, supervisor tekrar başlatır." "$msg_id" >/dev/null
+            tg_send "$chat_id" "${MSG[bot_restart_dispatch_fmt]}" "$msg_id" >/dev/null
             return ;;
         # ─── schedule / heartbeat / quiet ──────────────────────────────
         /quiet_hours|/quiet|/sessiz)   reply=$(cmd_quiet_hours "$args") ;;

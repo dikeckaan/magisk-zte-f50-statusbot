@@ -347,6 +347,142 @@ On confirmation the device will REBOOT."
     # ─── /iptal during IMEI captcha ──────────────────────────────────
     [imei_cancel_done]="✓ IMEI query cancelled"
 
+    # ─── inline button captions (tg_send_with_cancel, reboot) ───────
+    [btn_cancel]="❌ Cancel"
+    [btn_reboot_now]="🔁 Reboot Now"
+
+    # ─── csq_label (cellular signal quality) ─────────────────────────
+    [csq_excellent]="🟢 Excellent"
+    [csq_good]="🟢 Good"
+    [csq_moderate]="🟡 Moderate"
+    [csq_weak]="🟠 Weak"
+    [csq_very_weak]="🔴 Very weak"
+    [csq_unknown]="🔴 Unknown"
+
+    # ─── fmt_traffic / interfaces ────────────────────────────────────
+    [iface_default_exit]=" ⬅ default exit"
+    [iface_traffic_up_fmt]="  ↑ %s sent"
+    [no_sendat_short]="(sendat unavailable - UFI-TOOLS not installed)"
+    [lte_details]="LTE Details:"
+
+    # ─── /cat ────────────────────────────────────────────────────────
+    [cat_usage]="Usage: /cat <file>"
+    [cat_truncated_hint_fmt]="... (rest: /file %s)"
+    [cat_no_file_fmt]="❌ File not found: %s"
+    [cat_file_header_fmt]="📄 %s (%d bytes — first 4000)"
+    [cat_short_header_fmt]="📄 %s"
+
+    # ─── /df /du /connections /listening /dns /dhcp ──────────────────
+    [df_header]="💿 Disk Usage:"
+    [du_header_fmt]="📊 %s subdirectory sizes:"
+    [du_no_dir_fmt]="❌ Directory not found: %s"
+    [conn_header]="🔗 Established TCP connections (top 30):"
+    [listen_header]="👂 Listening TCP ports:"
+    [dns_header]="🌐 DNS Configuration:"
+    [dns_active]="Active DNS (Android props):"
+    [dhcp_header]="📋 DHCP / Connected Devices"
+    [dhcp_no_server]="DHCP server: none (hotspot may be off)"
+    [dhcp_server_fmt]="DHCP server: dnsmasq (PID %s, stateless)"
+    [dhcp_bridge_fmt]="Bridge:       %s"
+    [dhcp_clients_header]="👥 Active clients (ip neigh dev br0):"
+    [dhcp_none]="  (none)"
+    [dhcp_total_fmt]="Total: %d device(s)"
+
+    # ─── /cpu_freq /cpu_governor /wakelock ───────────────────────────
+    [cpufreq_header]="⚡ CPU Frequencies"
+    [cpufreq_line_fmt]="  CPU%d: %d MHz (gov=%s, %d-%d MHz)\n"
+    [gov_status_header]="⚙️ CPU governor status:"
+    [gov_online_label]="🟢 online "
+    [gov_offline_label]="⚫ offline"
+    [gov_line_fmt]="  cpu%d  %s  %s\n"
+    [gov_available_fmt]="Available: %s"
+    [gov_change_hint]="To change: /cpu_governor <name>  (resets at reboot)"
+    [gov_applied_fmt]="✅ %d cluster(s) → %s"
+    [gov_woken_fmt]="(temporarily onlined:%s — Android will re-offline)"
+    [gov_skipped_fmt]="⚠ %d cluster(s) skipped (permission/unsupported)"
+    [gov_no_change_fmt]="❌ No cluster updated (invalid governor: %s?)"
+    [wakelock_header]="💡 Active Wakelocks:"
+    [wakelock_unread]="  wakeup_sources unreadable"
+
+    # ─── /freeze /unfreeze /installed ────────────────────────────────
+    [freeze_usage]="Usage: /freeze <package>"
+    [unfreeze_usage]="Usage: /unfreeze <package>"
+    [freeze_done_fmt]="❄️ %s frozen"
+    [unfreeze_done_fmt]="✅ %s re-enabled"
+    [freeze_failed_fmt]="❌ Failed: %s"
+    [installed_user_header]="📦 3rd-party packages (top 30):"
+    [installed_disabled_header]="❄️ Disabled packages:"
+    [installed_system_header]="🤖 System packages (top 50):"
+    [installed_all_header_fmt]="📦 ALL packages (%d total, top 50):"
+    [installed_usage]="Usage: /installed [3rd|disabled|system|all]"
+
+    # ─── /who /last_boot ─────────────────────────────────────────────
+    [who_header]="👥 Active SSH/ADB sessions:"
+    [last_boot_header]="🔄 Boot History:"
+    [last_boot_current_fmt]="Currently up: %s"
+    [last_boot_prev]="Previous boots (from logcat):"
+
+    # ─── /log /dump_sms ──────────────────────────────────────────────
+    [log_header_fmt]="📝 Bot log last %d lines:"
+    [dump_sms_none]="📭 No SMS"
+    [dump_sms_count_fmt]="📨 SMS dump (%d messages) sending…"
+    [dump_sms_caption_fmt]="📨 SMS Dump (%d messages)"
+
+    # ─── /bot_stats ──────────────────────────────────────────────────
+    [bot_stats_fmt]="🤖 Bot Statistics
+
+Version:    %s
+Uptime:     %dh %dm
+Messages:   %d
+Error lines: %d
+Log size:   %d KB
+PID:        %d"
+    [bot_restart_msg]="🔄 Bot restarting…"
+    [bot_restart_dispatch_fmt]="🔄 Bot will restart in 2 s, supervisor will respawn it."
+
+    # ─── /operator (status line shortcut) ────────────────────────────
+    [op_status_fmt]="📡 %s"
+
+    # ─── /komut ──────────────────────────────────────────────────────
+    [komut_usage_fmt]="Usage: /komut <shell command>
+Example: /komut ls /data
+Runs up to %d s, auto-cancelled afterwards."
+    [komut_running_fmt]="🔄 Running:
+$ %s
+
+(Long output is sent on completion. ❌ Cancel to abort.)"
+
+    # ─── /sms_list /sms_count /cellinfo ──────────────────────────────
+    [sms_unread]="💬 SMS unreadable (content provider not accessible)"
+    [sms_count_hint]="Use: /sms_list  (default 10, e.g. /sms_list 20)"
+    [cellinfo_no_sendat]="❌ UFI-TOOLS (sendat) not available. Cellular info cannot be read."
+    [cellinfo_operator_fmt]="Operator: %s"
+    [cellinfo_net_fmt]="Network: %s"
+
+    # ─── /ip /clients /modules /tunnel ───────────────────────────────
+    [ip_local_header]="🏠 Local interfaces:"
+    [modules_header]="🧩 Magisk Modules:"
+    [tunnel_off]="❌ Cloudflared not running"
+    [clients_header]="📶 ARP/Neighbor table:"
+    [clients_none]="  (no active record)"
+
+    # ─── /ping ───────────────────────────────────────────────────────
+    [ping_usage]="Usage: /ping <host>"
+    [ping_invalid_host]="❌ Invalid host"
+
+    # ─── /speedtest loop ─────────────────────────────────────────────
+    [loop_already_running_fmt]="⚠ Loop already running (PID %s). First: /iptal"
+    [loop_empty_result_fmt]="⚠ Loop #%d: empty result (rc=%s), stopping"
+    [loop_started_fmt]="🔁 Loop started
+provider: %s
+count: %s
+First result arrives in 15-30 s.
+
+Stop: /iptal"
+    [loop_iter_fmt]="🔁 Loop #%d (%s)
+%s"
+    [loop_done_fmt]="✅ Speedtest loop finished (%d iter, %s)"
+
     # ─── misc inline (file ops, errors) ──────────────────────────────
     [common_not_exists_fmt]="❌ Doesn't exist: %s"
 

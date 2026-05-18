@@ -337,6 +337,142 @@ Uygulanınca cihaz REBOOT olacak."
     # ─── /iptal during IMEI captcha ──────────────────────────────────
     [imei_cancel_done]="✓ IMEI sorgu iptal edildi"
 
+    # ─── inline buton başlıkları ─────────────────────────────────────
+    [btn_cancel]="❌ İptal"
+    [btn_reboot_now]="🔁 Şimdi Yeniden Başlat"
+
+    # ─── csq_label (sinyal kalitesi) ─────────────────────────────────
+    [csq_excellent]="🟢 Mükemmel"
+    [csq_good]="🟢 İyi"
+    [csq_moderate]="🟡 Orta"
+    [csq_weak]="🟠 Zayıf"
+    [csq_very_weak]="🔴 Çok zayıf"
+    [csq_unknown]="🔴 Bilinmeyen"
+
+    # ─── fmt_traffic / arayüzler ─────────────────────────────────────
+    [iface_default_exit]=" ⬅ varsayılan çıkış"
+    [iface_traffic_up_fmt]="  ↑ %s yüklenen"
+    [no_sendat_short]="(sendat yok - UFI-TOOLS yüklü değil)"
+    [lte_details]="LTE Detayları:"
+
+    # ─── /cat ────────────────────────────────────────────────────────
+    [cat_usage]="Kullanım: /cat <dosya>"
+    [cat_truncated_hint_fmt]="... (kalan: /file %s ile çek)"
+    [cat_no_file_fmt]="❌ Dosya yok: %s"
+    [cat_file_header_fmt]="📄 %s (%d byte — ilk 4000)"
+    [cat_short_header_fmt]="📄 %s"
+
+    # ─── /df /du /connections /listening /dns /dhcp ──────────────────
+    [df_header]="💿 Disk Kullanımı:"
+    [du_header_fmt]="📊 %s alt dizin boyutları:"
+    [du_no_dir_fmt]="❌ Dizin yok: %s"
+    [conn_header]="🔗 Established TCP bağlantıları (top 30):"
+    [listen_header]="👂 Dinleyen TCP portları:"
+    [dns_header]="🌐 DNS Yapılandırması:"
+    [dns_active]="Active DNS (Android props):"
+    [dhcp_header]="📋 DHCP / Bağlı Cihazlar"
+    [dhcp_no_server]="DHCP sunucusu: yok (hotspot kapalı olabilir)"
+    [dhcp_server_fmt]="DHCP sunucusu: dnsmasq (PID %s, stateless)"
+    [dhcp_bridge_fmt]="Bridge:       %s"
+    [dhcp_clients_header]="👥 Aktif istemciler (ip neigh dev br0):"
+    [dhcp_none]="  (yok)"
+    [dhcp_total_fmt]="Toplam: %d cihaz"
+
+    # ─── /cpu_freq /cpu_governor /wakelock ───────────────────────────
+    [cpufreq_header]="⚡ CPU Frekansları"
+    [cpufreq_line_fmt]="  CPU%d: %d MHz (gov=%s, %d-%d MHz)\n"
+    [gov_status_header]="⚙️ CPU governor durumu:"
+    [gov_online_label]="🟢 online "
+    [gov_offline_label]="⚫ offline"
+    [gov_line_fmt]="  cpu%d  %s  %s\n"
+    [gov_available_fmt]="Mevcut: %s"
+    [gov_change_hint]="Değiştirmek: /cpu_governor <ad>  (reboot'ta sıfırlanır)"
+    [gov_applied_fmt]="✅ %d cluster → %s"
+    [gov_woken_fmt]="(geçici online edildi:%s — Android tekrar offline'a alacak)"
+    [gov_skipped_fmt]="⚠ %d cluster atlandı (yetki/desteklenmeyen)"
+    [gov_no_change_fmt]="❌ Hiçbir cluster güncellenmedi (geçersiz governor: %s?)"
+    [wakelock_header]="💡 Aktif Wakelock'lar:"
+    [wakelock_unread]="  wakeup_sources okunamadı"
+
+    # ─── /freeze /unfreeze /installed ────────────────────────────────
+    [freeze_usage]="Kullanım: /freeze <paket>"
+    [unfreeze_usage]="Kullanım: /unfreeze <paket>"
+    [freeze_done_fmt]="❄️ %s donduruldu"
+    [unfreeze_done_fmt]="✅ %s yeniden aktif"
+    [freeze_failed_fmt]="❌ Başarısız: %s"
+    [installed_user_header]="📦 3rd-party paketler (top 30):"
+    [installed_disabled_header]="❄️ Devre dışı paketler:"
+    [installed_system_header]="🤖 Sistem paketleri (top 50):"
+    [installed_all_header_fmt]="📦 TÜM paketler (%d toplam, top 50):"
+    [installed_usage]="Kullanım: /installed [3rd|disabled|system|all]"
+
+    # ─── /who /last_boot ─────────────────────────────────────────────
+    [who_header]="👥 Aktif SSH/ADB Oturumları:"
+    [last_boot_header]="🔄 Boot Geçmişi:"
+    [last_boot_current_fmt]="Şu anki: up %s"
+    [last_boot_prev]="Önceki boot'lar (logcat'ten):"
+
+    # ─── /log /dump_sms ──────────────────────────────────────────────
+    [log_header_fmt]="📝 Bot log son %d satır:"
+    [dump_sms_none]="📭 SMS yok"
+    [dump_sms_count_fmt]="📨 SMS dump (%d mesaj) gönderiliyor…"
+    [dump_sms_caption_fmt]="📨 SMS Dump (%d mesaj)"
+
+    # ─── /bot_stats ──────────────────────────────────────────────────
+    [bot_stats_fmt]="🤖 Bot İstatistikleri
+
+Sürüm:      %s
+Uptime:     %dsa %ddk
+Mesaj:      %d
+Hata sat.:  %d
+Log size:   %d KB
+PID:        %d"
+    [bot_restart_msg]="🔄 Bot yeniden başlatılıyor…"
+    [bot_restart_dispatch_fmt]="🔄 Bot 2 sn içinde restart, supervisor tekrar başlatır."
+
+    # ─── /operator (status line shortcut) ────────────────────────────
+    [op_status_fmt]="📡 %s"
+
+    # ─── /komut ──────────────────────────────────────────────────────
+    [komut_usage_fmt]="Kullanım: /komut <shell komutu>
+Örnek: /komut ls /data
+Maks %d sn çalışır, üzeri otomatik iptal."
+    [komut_running_fmt]="🔄 Çalışıyor:
+$ %s
+
+(Uzun çıktı bittiğinde gönderilir. ❌ İptal ile durdurabilirsin.)"
+
+    # ─── /sms_list /sms_count /cellinfo ──────────────────────────────
+    [sms_unread]="💬 SMS okunamadı (içerik sağlayıcı erişilemedi)"
+    [sms_count_hint]="Kullan: /sms_list  (varsayılan 10, /sms_list 20 gibi)"
+    [cellinfo_no_sendat]="❌ UFI-TOOLS (sendat) bulunamadı. Cellular bilgi alınamaz."
+    [cellinfo_operator_fmt]="Operatör: %s"
+    [cellinfo_net_fmt]="Şebeke: %s"
+
+    # ─── /ip /clients /modules /tunnel ───────────────────────────────
+    [ip_local_header]="🏠 Local arayüzler:"
+    [modules_header]="🧩 Magisk Modülleri:"
+    [tunnel_off]="❌ Cloudflared kapalı"
+    [clients_header]="📶 ARP/Komşu Tablosu:"
+    [clients_none]="  (aktif kayıt yok)"
+
+    # ─── /ping ───────────────────────────────────────────────────────
+    [ping_usage]="Kullanım: /ping <host>"
+    [ping_invalid_host]="❌ Geçersiz host"
+
+    # ─── /speedtest loop ─────────────────────────────────────────────
+    [loop_already_running_fmt]="⚠ Zaten loop çalışıyor (PID %s). Önce: /iptal"
+    [loop_empty_result_fmt]="⚠ Loop #%d: boş sonuç (rc=%s), durduruluyor"
+    [loop_started_fmt]="🔁 Loop başlatıldı
+provider: %s
+adet: %s
+İlk sonuç 15-30 sn içinde gelir.
+
+Durdurmak: /iptal"
+    [loop_iter_fmt]="🔁 Loop #%d (%s)
+%s"
+    [loop_done_fmt]="✅ Speedtest loop bitti (%d iter, %s)"
+
     # ─── misc inline (file ops, errors) ──────────────────────────────
     [common_not_exists_fmt]="❌ Yok: %s"
 
