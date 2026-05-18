@@ -286,6 +286,64 @@ Note: this modem may not support AT-based SMS sending. Try the UFI web UI."
     [cb_no_output]="<no output>"
     [cb_unknown]="Unknown action"
 
+    # ─── /imei_sorgula ──────────────────────────────────────────────
+    [imeis_usage]="Usage: /imei_sorgula <15-digit imei>"
+    [imeis_digits_only]="❌ IMEI must be digits only"
+    [imeis_length_fmt]="❌ Must be 15 digits (you entered %d)"
+    [imeis_luhn_ok]="✓ Luhn valid"
+    [imeis_luhn_bad]="❌ Luhn invalid"
+    [imeis_header_fmt]="📱 IMEI: %s
+
+🔍 Structural Analysis
+TAC: %s (manufacturer + model code)
+SNR: %s (serial number)
+Check: %s (%s)"
+    [imeis_edevlet_failed_fmt]="%s
+
+⚠️ Could not reach e-Devlet"
+    [imeis_captcha_caption]="📱 IMEI lookup captcha:
+Type what you see as a message (2 min, 4-7 chars).
+Cancel: /iptal"
+    [imeis_result_fmt]="%s
+
+📋 e-Devlet Result
+%s"
+    [imeis_captcha_failed_fmt]="%s
+
+❌ Wrong captcha or timeout.
+Retry: /imei_sorgula %s"
+
+    # ─── /imei_degis ─────────────────────────────────────────────────
+    [imei_degis_no_sendat]="❌ sendat not available"
+    [imei_degis_no_pending]="⚠️ No pending IMEI change. First run: /imei_degis <new_imei>"
+    [imei_degis_expired]="⚠️ Timed out (>2 min). Restart."
+    [imei_degis_applied_fmt]="📱 IMEI change applied.
+Old: %s
+New: %s
+Modem response: %s
+
+🔁 The device will reboot in 5 seconds…"
+    [imei_degis_usage]="Usage: /imei_degis <new_imei>
+- Must be 15 digits
+- To confirm: type \"/imei_degis YES\" within 2 minutes
+- On confirmation, applied + device reboots
+
+⚠️ Uses AT+SPIMEI=0,\"…\" (Unisoc-specific).
+A wrong IMEI can get you in legal trouble."
+    [imei_degis_digits_only]="❌ IMEI must contain digits only"
+    [imei_degis_length_fmt]="❌ IMEI must be 15 digits (you entered %d)"
+    [imei_degis_bad_luhn]="❌ Invalid IMEI (Luhn checksum doesn't match).
+The last digit is a check digit — use a calculator."
+    [imei_degis_pending_fmt]="⚠️ IMEI Change — Awaiting Confirmation
+
+Current: %s
+New:     %s
+
+To confirm within 2 minutes:
+  /imei_degis YES
+
+On confirmation the device will REBOOT."
+
     # ─── /iptal during IMEI captcha ──────────────────────────────────
     [imei_cancel_done]="✓ IMEI query cancelled"
 

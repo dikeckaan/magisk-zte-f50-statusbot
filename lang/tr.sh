@@ -276,6 +276,64 @@ Not: bu modem AT tabanlı SMS gönderimi desteklemiyor olabilir. UFI web UI'sın
     [cb_no_output]="<çıktı yok>"
     [cb_unknown]="Bilinmeyen action"
 
+    # ─── /imei_sorgula ──────────────────────────────────────────────
+    [imeis_usage]="Kullanım: /imei_sorgula <15 haneli imei>"
+    [imeis_digits_only]="❌ IMEI sadece rakam olmalı"
+    [imeis_length_fmt]="❌ 15 hane olmalı (girdiğin %d hane)"
+    [imeis_luhn_ok]="✓ Luhn geçerli"
+    [imeis_luhn_bad]="❌ Luhn geçersiz"
+    [imeis_header_fmt]="📱 IMEI: %s
+
+🔍 Yapısal Analiz
+TAC: %s (üretici+model kodu)
+SNR: %s (seri no)
+Check: %s (%s)"
+    [imeis_edevlet_failed_fmt]="%s
+
+⚠️ e-Devlet'e erişilemedi"
+    [imeis_captcha_caption]="📱 IMEI Sorgu için captcha:
+Görseldekini bir mesaj olarak yaz (2dk, 4-7 karakter).
+İptal: /iptal"
+    [imeis_result_fmt]="%s
+
+📋 e-Devlet Sonucu
+%s"
+    [imeis_captcha_failed_fmt]="%s
+
+❌ Captcha yanlış veya zaman aşımı.
+Tekrar: /imei_sorgula %s"
+
+    # ─── /imei_degis ─────────────────────────────────────────────────
+    [imei_degis_no_sendat]="❌ sendat yok"
+    [imei_degis_no_pending]="⚠️ Bekleyen IMEI değişikliği yok. Önce: /imei_degis <yeni_imei>"
+    [imei_degis_expired]="⚠️ Süre doldu (>2dk). Yeniden başlat."
+    [imei_degis_applied_fmt]="📱 IMEI değişikliği uygulandı.
+Eski: %s
+Yeni: %s
+Modem yanıtı: %s
+
+🔁 5sn içinde cihaz reboot olacak…"
+    [imei_degis_usage]="Kullanım: /imei_degis <yeni_imei>
+- 15 haneli rakam olmalı
+- Onay için \"/imei_degis YES\" yaz (2 dakika içinde)
+- Onaylanınca uygulanır + cihaz reboot olur
+
+⚠️ AT+SPIMEI=0,\"…\" kullanır (Unisoc-spesifik).
+Yanlış IMEI cihazı yasal sorunlara sokabilir."
+    [imei_degis_digits_only]="❌ IMEI sadece rakam içermeli"
+    [imei_degis_length_fmt]="❌ IMEI 15 hane olmalı (girdiğin %d hane)"
+    [imei_degis_bad_luhn]="❌ Geçersiz IMEI (Luhn checksum tutmuyor).
+Son hane check digit'tir, hesaplayıcı kullan."
+    [imei_degis_pending_fmt]="⚠️ IMEI Değişikliği — Onay Bekleniyor
+
+Mevcut: %s
+Yeni:   %s
+
+Onaylamak için 2dk içinde:
+  /imei_degis YES
+
+Uygulanınca cihaz REBOOT olacak."
+
     # ─── /iptal during IMEI captcha ──────────────────────────────────
     [imei_cancel_done]="✓ IMEI sorgu iptal edildi"
 

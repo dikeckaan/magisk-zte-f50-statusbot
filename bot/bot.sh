@@ -519,28 +519,24 @@ cmd_imei_sorgula() {
         if [ -x "$SENDAT" ]; then
             imei=$(at_cmd "AT+CGSN" 0 | sed 's/[^0-9]//g')
         fi
-        [ -z "$imei" ] && { tg_send "$chat_id" "Kullanım: /imei_sorgula <15 haneli imei>"; return; }
+        [ -z "$imei" ] && { tg_send "$chat_id" "${MSG[imeis_usage]}"; return; }
     fi
 
     # Validate
     case "$imei" in
-        *[!0-9]*) tg_send "$chat_id" "❌ IMEI sadece rakam olmalı"; return ;;
+        *[!0-9]*) tg_send "$chat_id" "${MSG[imeis_digits_only]}"; return ;;
     esac
-    [ ${#imei} -ne 15 ] && { tg_send "$chat_id" "❌ 15 hane olmalı (girdiğin ${#imei} hane)"; return; }
+    [ ${#imei} -ne 15 ] && { tg_send "$chat_id" "$(printf "${MSG[imeis_length_fmt]}" "${#imei}")"; return; }
 
-    local luhn_ok="❌ Luhn geçersiz"
-    luhn_check "$imei" && luhn_ok="✓ Luhn geçerli"
+    local luhn_ok="${MSG[imeis_luhn_bad]}"
+    luhn_check "$imei" && luhn_ok="${MSG[imeis_luhn_ok]}"
 
     local tac=$(echo "$imei" | cut -c1-8)
     local snr=$(echo "$imei" | cut -c9-14)
     local cd=$(echo "$imei" | cut -c15)
 
-    local header="📱 IMEI: $imei
-
-🔍 Yapısal Analiz
-TAC: $tac (üretici+model kodu)
-SNR: $snr (seri no)
-Check: $cd ($luhn_ok)"
+    local header
+    header=$(printf "${MSG[imeis_header_fmt]}" "$imei" "$tac" "$snr" "$cd" "$luhn_ok")
 
     local UA="Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
     local jar="$DATADIR/.edevlet_cookies"
@@ -550,9 +546,7 @@ Check: $cd ($luhn_ok)"
     local tok
     tok=$(edevlet_session_get_token_captcha "$jar" "$captcha_file" "$UA")
     if [ -z "$tok" ]; then
-        tg_send "$chat_id" "$header
-
-⚠️ e-Devlet'e erişilemedi"
+        tg_send "$chat_id" "$(printf "${MSG[imeis_edevlet_failed_fmt]}" "$header")"
         return
     fi
 
@@ -565,9 +559,7 @@ Check: $cd ($luhn_ok)"
         echo "header_b64=$(echo "$header" | base64 | tr -d '\n')"
     } > "$DATADIR/pending_imei_sorgu"
 
-    tg_send_photo "$chat_id" "$captcha_file" "📱 IMEI Sorgu için captcha:
-Görseldekini bir mesaj olarak yaz (2dk, 4-7 karakter).
-İptal: /iptal"
+    tg_send_photo "$chat_id" "$captcha_file" "${MSG[imeis_captcha_caption]}"
 }
 
 handle_captcha_response() {
@@ -590,18 +582,12 @@ handle_captcha_response() {
     result=$(edevlet_submit_and_process "$jar" "$token" "$imei" "$captcha" "$UA")
     if [ $? -eq 0 ] && [ -n "$result" ]; then
         rm -f "$jar" "$DATADIR/.captcha.png"
-        tg_send "$chat_id" "$header
-
-📋 e-Devlet Sonucu
-$result"
+        tg_send "$chat_id" "$(printf "${MSG[imeis_result_fmt]}" "$header" "$result")"
         return
     fi
 
     rm -f "$jar" "$DATADIR/.captcha.png"
-    tg_send "$chat_id" "$header
-
-❌ Captcha yanlış veya zaman aşımı.
-Tekrar: /imei_sorgula $imei" "$msg_id"
+    tg_send "$chat_id" "$(printf "${MSG[imeis_captcha_failed_fmt]}" "$header" "$imei")" "$msg_id"
 }
 
 cmd_ramclean() {
@@ -2451,7 +2437,7 @@ luhn_check() {
 }
 
 cmd_imei_degis() {
-    [ ! -x "$SENDAT" ] && { echo "❌ sendat yok"; return; }
+    [ ! -x "$SENDAT" ] && { echo "${MSG[imei_degis_no_sendat]}"; return; }
     local arg1="$1"
     local arg2="$2"
     local pending="$DATADIR/pending_imei_change"
@@ -2460,7 +2446,7 @@ cmd_imei_degis() {
     # Confirmation flow: /imei_degis YES
     if [ "$arg1" = "YES" ]; then
         if [ ! -f "$pending" ]; then
-            echo "⚠️ Bekleyen IMEI değişikliği yok. Önce: /imei_degis <yeni_imei>"
+            echo "${MSG[imei_degis_no_pending]}"
             return
         fi
         local ts new_imei
@@ -2468,65 +2454,40 @@ cmd_imei_degis() {
         new_imei=$(awk -F= '/^imei=/{print $2}' "$pending")
         if [ $((now - ts)) -ge 120 ]; then
             rm -f "$pending"
-            echo "⚠️ Süre doldu (>2dk). Yeniden başlat."
+            echo "${MSG[imei_degis_expired]}"
             return
         fi
         local old=$(at_cmd "AT+CGSN" 0 | sed 's/[^0-9]//g')
         local resp=$(at_cmd "AT+SPIMEI=0,\"$new_imei\"")
         rm -f "$pending"
-        echo "📱 IMEI değişikliği uygulandı.
-Eski: $old
-Yeni: $new_imei
-Modem yanıtı: $resp
-
-🔁 5sn içinde cihaz reboot olacak..."
+        tf imei_degis_applied_fmt "$old" "$new_imei" "$resp"
         ( sleep 5; /system/bin/reboot ) &
         return
     fi
 
     # First step: validate
     if [ -z "$arg1" ]; then
-        cat <<'EOF'
-Kullanım: /imei_degis <yeni_imei>
-- 15 haneli rakam olmalı
-- Onay için "/imei_degis YES" yaz (2 dakika içinde)
-- Onaylanınca uygulanır + cihaz reboot olur
-
-⚠️ AT+SPIMEI=0,"..." kullanır (Unisoc-spesifik).
-Yanlış IMEI cihazı yasal sorunlara sokabilir.
-EOF
+        echo "${MSG[imei_degis_usage]}"
         return
     fi
 
-    # Validate: 15 digits only
     case "$arg1" in
-        ''|*[!0-9]*) echo "❌ IMEI sadece rakam içermeli"; return ;;
+        ''|*[!0-9]*) echo "${MSG[imei_degis_digits_only]}"; return ;;
     esac
     local len=${#arg1}
     if [ "$len" -ne 15 ]; then
-        echo "❌ IMEI 15 hane olmalı (girdiğin $len hane)"
+        tf imei_degis_length_fmt "$len"
         return
     fi
     if ! luhn_check "$arg1"; then
-        echo "❌ Geçersiz IMEI (Luhn checksum tutmuyor).
-Son hane check digit'tir, hesaplayıcı kullan."
+        echo "${MSG[imei_degis_bad_luhn]}"
         return
     fi
 
     local old=$(at_cmd "AT+CGSN" 0 | sed 's/[^0-9]//g')
     echo "ts=$now"  > "$pending"
     echo "imei=$arg1" >> "$pending"
-    cat <<EOF
-⚠️ IMEI Değişikliği — Onay Bekleniyor
-
-Mevcut: $old
-Yeni:   $arg1
-
-Onaylamak için 2dk içinde:
-  /imei_degis YES
-
-Uygulanınca cihaz REBOOT olacak.
-EOF
+    tf imei_degis_pending_fmt "$old" "$arg1"
 }
 
 cmd_airplane() {
