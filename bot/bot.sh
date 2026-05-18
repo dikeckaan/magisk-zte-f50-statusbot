@@ -148,11 +148,11 @@ fmt_uptime() {
     local m=$(( (s%3600)/60 ))
     local sec=$((s%60))
     if [ "$d" -gt 0 ]; then
-        printf "%d gün %02d sa %02d dk" "$d" "$h" "$m"
+        printf "${MSG[uptime_days_fmt]}" "$d" "$h" "$m"
     elif [ "$h" -gt 0 ]; then
-        printf "%d sa %02d dk" "$h" "$m"
+        printf "${MSG[uptime_hours_fmt]}" "$h" "$m"
     else
-        printf "%d dk %02d sn" "$m" "$sec"
+        printf "${MSG[uptime_short_fmt]}" "$m" "$sec"
     fi
 }
 
@@ -165,7 +165,7 @@ fmt_mem() {
 }
 
 fmt_disk() {
-    df -h /data 2>/dev/null | awk 'NR==2 {printf "%s / %s (%s dolu)", $3, $2, $5}'
+    df -h /data 2>/dev/null | awk -v fmt="${MSG[disk_fmt]}" 'NR==2 {printf fmt, $3, $2, $5}'
 }
 
 fmt_load() {
@@ -177,25 +177,12 @@ fmt_load() {
     local pct
     pct=$(awk -v l="$l1" -v c="$cores" 'BEGIN {printf "%d", l*100/c}')
     local status
-    if   [ "$pct" -lt 50 ];  then status="🟢 Rahat ($pct%)"
-    elif [ "$pct" -lt 80 ];  then status="🟡 Aktif ($pct%)"
-    elif [ "$pct" -lt 120 ]; then status="🟠 Dolu ($pct%)"
-    else                          status="🔴 Yoğun ($pct%)"
+    if   [ "$pct" -lt 50 ];  then status=$(printf "${MSG[load_status_calm]}"   "$pct")
+    elif [ "$pct" -lt 80 ];  then status=$(printf "${MSG[load_status_active]}" "$pct")
+    elif [ "$pct" -lt 120 ]; then status=$(printf "${MSG[load_status_full]}"   "$pct")
+    else                          status=$(printf "${MSG[load_status_busy]}"   "$pct")
     fi
-    cat <<EOF
-📊 CPU Yükü ($cores çekirdek)
-
-Şu an (1dk ort):   $l1
-Son 5dk:           $l5
-Son 15dk:          $l15
-
-Durum: $status
-
-Yük rehberi:
-  $cores.0 = tüm CPU'lar tam dolu
-  < ${cores}.0 = boşta kapasite var
-  > ${cores}.0 = kuyruk var, yavaşlamalar olabilir
-EOF
+    printf "${MSG[load_full_fmt]}\n" "$cores" "$l1" "$l5" "$l15" "$status" "$cores" "$cores" "$cores"
 }
 
 fmt_temp() {
@@ -371,25 +358,25 @@ cmd_help() {
 }
 
 cmd_status() {
-    printf "📱 %s\n" "$(getprop ro.product.model) ($(getprop ro.build.display.id))"
-    printf "⏱  Uptime: %s\n" "$(fmt_uptime)"
-    printf "💾 RAM: %s\n" "$(fmt_mem)"
-    printf "💿 Disk: %s\n" "$(fmt_disk)"
-    printf "🌡  Sıcaklık: %s\n" "$(fmt_temp)"
+    printf "${MSG[status_model_fmt]}" "$(getprop ro.product.model) ($(getprop ro.build.display.id))"
+    printf "${MSG[status_uptime_fmt]}" "$(fmt_uptime)"
+    printf "${MSG[status_ram_fmt]}"    "$(fmt_mem)"
+    printf "${MSG[status_disk_fmt]}"   "$(fmt_disk)"
+    printf "${MSG[status_temp_fmt]}"   "$(fmt_temp)"
     # Performance mode
     local perf_mode
     perf_mode=$(zte_get "performance_mode" | "$JQ" -r '.performance_mode // empty' 2>/dev/null)
     case "$perf_mode" in
-        1) printf "⚡ Performance: AÇIK 🟢\n" ;;
-        0) printf "⚡ Performance: KAPALI ⚪\n" ;;
+        1) printf "${MSG[status_perf_on]}" ;;
+        0) printf "${MSG[status_perf_off]}" ;;
     esac
-    printf "📡 Operatör: %s\n" "$(fmt_operator)"
+    printf "${MSG[status_operator_fmt]}" "$(fmt_operator)"
     # CSQ if sendat available
     if [ -x "$SENDAT" ]; then
         csq=$(at_cmd "AT+CSQ" | sed -n 's/.*+CSQ: *\([0-9]*\),.*/\1/p')
-        [ -n "$csq" ] && printf "📶 Sinyal: RSSI %s (%s)\n" "$csq" "$(csq_to_dbm "$csq")"
+        [ -n "$csq" ] && printf "${MSG[status_signal_fmt]}" "$csq" "$(csq_to_dbm "$csq")"
     fi
-    printf "🌐 Public IP: %s" "$(fmt_public_ip)"
+    printf "${MSG[status_public_ip_fmt]}" "$(fmt_public_ip)"
 }
 
 cmd_at() {

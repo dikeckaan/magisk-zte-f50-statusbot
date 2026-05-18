@@ -129,6 +129,44 @@ naber — durum + selamlama
 saat — cihaz saati
 iyi misin — durum kontrol"
 
+    # ─── fmt_uptime ──────────────────────────────────────────────────
+    [uptime_days_fmt]="%d gün %02d sa %02d dk"
+    [uptime_hours_fmt]="%d sa %02d dk"
+    [uptime_short_fmt]="%d dk %02d sn"
+
+    # ─── fmt_disk ────────────────────────────────────────────────────
+    [disk_fmt]="%s / %s (%s dolu)"
+
+    # ─── fmt_load ────────────────────────────────────────────────────
+    [load_status_calm]="🟢 Rahat (%d%%)"
+    [load_status_active]="🟡 Aktif (%d%%)"
+    [load_status_full]="🟠 Dolu (%d%%)"
+    [load_status_busy]="🔴 Yoğun (%d%%)"
+    [load_full_fmt]="📊 CPU Yükü (%d çekirdek)
+
+Şu an (1dk ort):   %s
+Son 5dk:           %s
+Son 15dk:          %s
+
+Durum: %s
+
+Yük rehberi:
+  %d.0 = tüm CPU'lar tam dolu
+  < %d.0 = boşta kapasite var
+  > %d.0 = kuyruk var, yavaşlamalar olabilir"
+
+    # ─── /status ─────────────────────────────────────────────────────
+    [status_model_fmt]="📱 %s\n"
+    [status_uptime_fmt]="⏱  Uptime: %s\n"
+    [status_ram_fmt]="💾 RAM: %s\n"
+    [status_disk_fmt]="💿 Disk: %s\n"
+    [status_temp_fmt]="🌡  Sıcaklık: %s\n"
+    [status_perf_on]="⚡ Performance: AÇIK 🟢\n"
+    [status_perf_off]="⚡ Performance: KAPALI ⚪\n"
+    [status_operator_fmt]="📡 Operatör: %s\n"
+    [status_signal_fmt]="📶 Sinyal: RSSI %s (%s)\n"
+    [status_public_ip_fmt]="🌐 Public IP: %s"
+
     # ─── /perf_help ──────────────────────────────────────────────────
     [perf_help_full]="⚡ CPU/Performance Kullanım Kılavuzu
 

@@ -139,6 +139,44 @@ naber — status + greeting
 saat — device time
 iyi misin — status check"
 
+    # ─── fmt_uptime (3 forms) ────────────────────────────────────────
+    [uptime_days_fmt]="%d d %02d h %02d m"
+    [uptime_hours_fmt]="%d h %02d m"
+    [uptime_short_fmt]="%d m %02d s"
+
+    # ─── fmt_disk ────────────────────────────────────────────────────
+    [disk_fmt]="%s / %s (%s used)"
+
+    # ─── fmt_load ────────────────────────────────────────────────────
+    [load_status_calm]="🟢 calm (%d%%)"
+    [load_status_active]="🟡 active (%d%%)"
+    [load_status_full]="🟠 full (%d%%)"
+    [load_status_busy]="🔴 busy (%d%%)"
+    [load_full_fmt]="📊 CPU Load (%d cores)
+
+Now (1 min avg):   %s
+Last 5 min:        %s
+Last 15 min:       %s
+
+Status: %s
+
+Load guide:
+  %d.0 = all CPUs fully used
+  < %d.0 = headroom available
+  > %d.0 = queue, slowdowns possible"
+
+    # ─── /status ─────────────────────────────────────────────────────
+    [status_model_fmt]="📱 %s\n"
+    [status_uptime_fmt]="⏱  Uptime: %s\n"
+    [status_ram_fmt]="💾 RAM: %s\n"
+    [status_disk_fmt]="💿 Disk: %s\n"
+    [status_temp_fmt]="🌡  Temperature: %s\n"
+    [status_perf_on]="⚡ Performance: ON 🟢\n"
+    [status_perf_off]="⚡ Performance: OFF ⚪\n"
+    [status_operator_fmt]="📡 Operator: %s\n"
+    [status_signal_fmt]="📶 Signal: RSSI %s (%s)\n"
+    [status_public_ip_fmt]="🌐 Public IP: %s"
+
     # ─── /perf_help (full text) ───────────────────────────────────────
     [perf_help_full]="⚡ CPU / Performance guide
 
