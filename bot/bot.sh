@@ -1846,13 +1846,13 @@ cmd_iptal() {
     if [ -f "$DATADIR/pending_imei_sorgu" ]; then
         rm -f "$DATADIR/pending_imei_sorgu" "$DATADIR/.edevlet_cookies" "$DATADIR/.captcha.png"
         cancelled="$cancelled
-  ✓ IMEI sorgusu"
+${MSG[iptal_imei]}"
     fi
     # Upload
     if [ -f "$DATADIR/pending_upload" ]; then
         rm -f "$DATADIR/pending_upload"
         cancelled="$cancelled
-  ✓ Bekleyen upload"
+${MSG[iptal_upload]}"
     fi
     # Speedtest loop
     if [ -f "$DATADIR/speedtest_loop.pid" ]; then
@@ -1861,12 +1861,12 @@ cmd_iptal() {
         rm -f "$DATADIR/speedtest_loop.pid"
         [ -n "$pid" ] && kill "$pid" 2>/dev/null
         cancelled="$cancelled
-  ✓ Speedtest loop"
+${MSG[iptal_speedtest]}"
     fi
     if [ -z "$cancelled" ]; then
-        echo "Beklemede iptal edilecek bir şey yok"
+        echo "${MSG[iptal_none]}"
     else
-        echo "🛑 İptal edildi:$cancelled"
+        tf iptal_done_fmt "$cancelled"
     fi
 }
 
@@ -2169,40 +2169,36 @@ cmd_performance() {
             resp=$(zte_get "performance_mode")
             mode=$(echo "$resp" | "$JQ" -r '.performance_mode // empty')
             case "$mode" in
-                1) echo "⚡ Performance Modu: AÇIK 🟢
-Kapatmak: /performance off" ;;
-                0) echo "⚡ Performance Modu: KAPALI ⚪
-Açmak: /performance on" ;;
-                *) echo "⚠️ Durum okunamadı: $resp" ;;
+                1) echo "${MSG[perf_status_on]}" ;;
+                0) echo "${MSG[perf_status_off]}" ;;
+                *) tf perf_status_unread_fmt "$resp" ;;
             esac
             ;;
         on|aç|1)
-            [ ! -s "$ZTE_PWD_FILE" ] && { echo "❌ ZTE şifresi tanımlı değil. Önce: /zte_setpw <şifre>"; return; }
+            [ ! -s "$ZTE_PWD_FILE" ] && { echo "${MSG[perf_no_password]}"; return; }
             local result
             result=$(zte_set_perf 1)
             if [ "$result" = "success" ]; then
-                echo "REBOOT_PROMPT|⚡ Performance Modu AÇILDI 🟢
-Değişikliğin geçerli olması için cihazı yeniden başlat."
+                echo "REBOOT_PROMPT|${MSG[perf_enabled_reboot]}"
             elif [ "$result" = "login_failed" ]; then
-                echo "❌ ZTE login başarısız. Şifre yanlış olabilir, /zte_setpw ile güncelle."
+                echo "${MSG[perf_login_failed]}"
             else
-                echo "❌ Set başarısız: $result"
+                tf perf_set_failed_fmt "$result"
             fi
             ;;
         off|kapat|0)
-            [ ! -s "$ZTE_PWD_FILE" ] && { echo "❌ ZTE şifresi tanımlı değil. Önce: /zte_setpw <şifre>"; return; }
+            [ ! -s "$ZTE_PWD_FILE" ] && { echo "${MSG[perf_no_password]}"; return; }
             local result
             result=$(zte_set_perf 0)
             if [ "$result" = "success" ]; then
-                echo "REBOOT_PROMPT|⚡ Performance Modu KAPATILDI ⚪
-Değişikliğin geçerli olması için cihazı yeniden başlat."
+                echo "REBOOT_PROMPT|${MSG[perf_disabled_reboot]}"
             elif [ "$result" = "login_failed" ]; then
-                echo "❌ ZTE login başarısız."
+                echo "${MSG[perf_login_failed_short]}"
             else
-                echo "❌ Set başarısız: $result"
+                tf perf_set_failed_fmt "$result"
             fi
             ;;
-        *) echo "Kullanım: /performance [on|off|status]" ;;
+        *) echo "${MSG[perf_usage]}" ;;
     esac
 }
 
@@ -2597,18 +2593,15 @@ cmd_zte_setpw() {
     local pwd="$1"
     if [ -z "$pwd" ]; then
         if [ -s "$ZTE_PWD_FILE" ]; then
-            echo "ZTE şifresi tanımlı (uzunluk: $(wc -c < "$ZTE_PWD_FILE")).
-Değiştirmek için: /zte_setpw <yeni_şifre>"
+            tf zte_pw_set_fmt "$(wc -c < "$ZTE_PWD_FILE")"
         else
-            echo "Kullanım: /zte_setpw <şifre>
-(ZTE web admin şifresi - /performance vs için)"
+            echo "${MSG[zte_pw_usage]}"
         fi
         return
     fi
     printf %s "$pwd" > "$ZTE_PWD_FILE"
     chmod 600 "$ZTE_PWD_FILE"
-    echo "✓ ZTE şifresi kaydedildi ($(wc -c < "$ZTE_PWD_FILE") byte).
-Test: /performance"
+    tf zte_pw_saved_fmt "$(wc -c < "$ZTE_PWD_FILE")"
 }
 
 cmd_imei() {
@@ -3273,26 +3266,26 @@ cmd_reboot() {
             pending_ts=$(cat "$PENDING_REBOOT")
             if [ $((now - pending_ts)) -lt 60 ]; then
                 rm -f "$PENDING_REBOOT"
-                echo "🔁 Reboot başlatılıyor..."
+                echo "${MSG[reboot_starting]}"
                 ( sleep 2; /system/bin/reboot ) &
                 return
             fi
         fi
-        echo "⚠️ Süre doldu. Önce /reboot komutu ver."
+        echo "${MSG[reboot_expired]}"
     else
         echo "$now" > "$PENDING_REBOOT"
-        echo "⚠️ Onayla: 60sn içinde \"/reboot YES\" yaz."
+        echo "${MSG[reboot_confirm]}"
     fi
 }
 
 cmd_version() {
-    cat <<EOF
-🤖 Bot $BOT_VERSION
-📱 $(getprop ro.product.model)
-🏷  $(getprop ro.build.display.id)
-🤖 Android $(getprop ro.build.version.release) (SDK $(getprop ro.build.version.sdk))
-🐧 $(uname -r | cut -d- -f1)
-EOF
+    printf "${MSG[version_fmt]}\n" \
+        "$BOT_VERSION" \
+        "$(getprop ro.product.model)" \
+        "$(getprop ro.build.display.id)" \
+        "$(getprop ro.build.version.release)" \
+        "$(getprop ro.build.version.sdk)" \
+        "$(uname -r | cut -d- -f1)"
 }
 
 cmd_komut() {

@@ -165,6 +165,49 @@ Load guide:
   < %d.0 = headroom available
   > %d.0 = queue, slowdowns possible"
 
+    # ─── /performance ─────────────────────────────────────────────────
+    [perf_status_on]="⚡ Performance Mode: ON 🟢
+To turn off: /performance off"
+    [perf_status_off]="⚡ Performance Mode: OFF ⚪
+To turn on: /performance on"
+    [perf_status_unread_fmt]="⚠️ Could not read state: %s"
+    [perf_no_password]="❌ ZTE password not set. First run: /zte_setpw <password>"
+    [perf_login_failed]="❌ ZTE login failed. Wrong password? Update via /zte_setpw."
+    [perf_login_failed_short]="❌ ZTE login failed."
+    [perf_set_failed_fmt]="❌ Set failed: %s"
+    [perf_enabled_reboot]="⚡ Performance Mode ENABLED 🟢
+Reboot the device for the change to take effect."
+    [perf_disabled_reboot]="⚡ Performance Mode DISABLED ⚪
+Reboot the device for the change to take effect."
+    [perf_usage]="Usage: /performance [on|off|status]"
+
+    # ─── /zte_setpw ──────────────────────────────────────────────────
+    [zte_pw_set_fmt]="ZTE password is set (length: %d bytes).
+To change: /zte_setpw <new_password>"
+    [zte_pw_usage]="Usage: /zte_setpw <password>
+(ZTE web admin password — used by /performance and similar)"
+    [zte_pw_saved_fmt]="✓ ZTE password saved (%d bytes).
+Test: /performance"
+
+    # ─── /iptal ──────────────────────────────────────────────────────
+    [iptal_imei]="  ✓ IMEI query"
+    [iptal_upload]="  ✓ Pending upload"
+    [iptal_speedtest]="  ✓ Speedtest loop"
+    [iptal_none]="Nothing pending to cancel"
+    [iptal_done_fmt]="🛑 Cancelled:%s"
+
+    # ─── /reboot ─────────────────────────────────────────────────────
+    [reboot_starting]="🔁 Reboot starting…"
+    [reboot_expired]="⚠️ Timed out. Issue /reboot again first."
+    [reboot_confirm]="⚠️ Confirm: type \"/reboot YES\" within 60 s."
+
+    # ─── /version ────────────────────────────────────────────────────
+    [version_fmt]="🤖 Bot %s
+📱 %s
+🏷  %s
+🤖 Android %s (SDK %s)
+🐧 %s"
+
     # ─── /status ─────────────────────────────────────────────────────
     [status_model_fmt]="📱 %s\n"
     [status_uptime_fmt]="⏱  Uptime: %s\n"

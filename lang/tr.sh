@@ -155,6 +155,49 @@ Yük rehberi:
   < %d.0 = boşta kapasite var
   > %d.0 = kuyruk var, yavaşlamalar olabilir"
 
+    # ─── /performance ─────────────────────────────────────────────────
+    [perf_status_on]="⚡ Performance Modu: AÇIK 🟢
+Kapatmak: /performance off"
+    [perf_status_off]="⚡ Performance Modu: KAPALI ⚪
+Açmak: /performance on"
+    [perf_status_unread_fmt]="⚠️ Durum okunamadı: %s"
+    [perf_no_password]="❌ ZTE şifresi tanımlı değil. Önce: /zte_setpw <şifre>"
+    [perf_login_failed]="❌ ZTE login başarısız. Şifre yanlış olabilir, /zte_setpw ile güncelle."
+    [perf_login_failed_short]="❌ ZTE login başarısız."
+    [perf_set_failed_fmt]="❌ Set başarısız: %s"
+    [perf_enabled_reboot]="⚡ Performance Modu AÇILDI 🟢
+Değişikliğin geçerli olması için cihazı yeniden başlat."
+    [perf_disabled_reboot]="⚡ Performance Modu KAPATILDI ⚪
+Değişikliğin geçerli olması için cihazı yeniden başlat."
+    [perf_usage]="Kullanım: /performance [on|off|status]"
+
+    # ─── /zte_setpw ──────────────────────────────────────────────────
+    [zte_pw_set_fmt]="ZTE şifresi tanımlı (uzunluk: %d byte).
+Değiştirmek için: /zte_setpw <yeni_şifre>"
+    [zte_pw_usage]="Kullanım: /zte_setpw <şifre>
+(ZTE web admin şifresi — /performance vs için)"
+    [zte_pw_saved_fmt]="✓ ZTE şifresi kaydedildi (%d byte).
+Test: /performance"
+
+    # ─── /iptal ──────────────────────────────────────────────────────
+    [iptal_imei]="  ✓ IMEI sorgusu"
+    [iptal_upload]="  ✓ Bekleyen upload"
+    [iptal_speedtest]="  ✓ Speedtest loop"
+    [iptal_none]="Beklemede iptal edilecek bir şey yok"
+    [iptal_done_fmt]="🛑 İptal edildi:%s"
+
+    # ─── /reboot ─────────────────────────────────────────────────────
+    [reboot_starting]="🔁 Reboot başlatılıyor…"
+    [reboot_expired]="⚠️ Süre doldu. Önce /reboot komutu ver."
+    [reboot_confirm]="⚠️ Onayla: 60sn içinde \"/reboot YES\" yaz."
+
+    # ─── /version ────────────────────────────────────────────────────
+    [version_fmt]="🤖 Bot %s
+📱 %s
+🏷  %s
+🤖 Android %s (SDK %s)
+🐧 %s"
+
     # ─── /status ─────────────────────────────────────────────────────
     [status_model_fmt]="📱 %s\n"
     [status_uptime_fmt]="⏱  Uptime: %s\n"
