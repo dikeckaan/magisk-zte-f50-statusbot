@@ -155,6 +155,162 @@ Yük rehberi:
   < %d.0 = boşta kapasite var
   > %d.0 = kuyruk var, yavaşlamalar olabilir"
 
+    # ─── /file ───────────────────────────────────────────────────────
+    [file_usage]="Kullanım: /file <yol>
+Örnek: /file /data/statusbot/bot.log
+Maks 50 MB (Telegram limiti)"
+    [file_not_found_fmt]="❌ Dosya bulunamadı: %s"
+    [file_empty_fmt]="⚠️ Dosya boş: %s"
+    [file_too_big_fmt]="❌ Çok büyük: %d MB (limit 50 MB).
+Bölmek için: split -b 49M %s /tmp/part_"
+    [file_sending_fmt]="📤 Gönderiliyor (%s)…"
+    [file_unknown_error]="bilinmeyen"
+    [file_tg_rejected_fmt]="❌ Telegram reddetti: %s"
+    [file_caption_fmt]="📄 %s"
+
+    # ─── /screenshot ─────────────────────────────────────────────────
+    [ss_failed]="❌ Screencap başarısız (cihaz uyuyor olabilir veya secure window'da)"
+    [ss_taken_fmt]="📸 Çekildi (%d byte), gönderiliyor…"
+    [ss_caption_fmt]="📸 Ekran görüntüsü — %s"
+
+    # ─── /wifi ───────────────────────────────────────────────────────
+    [wifi_header]="📶 WiFi (Hotspot)"
+    [wifi_no_conf]="⚠️ hostapd.conf bulunamadı"
+    [wifi_ssid_fmt]="📡 SSID:    %s"
+    [wifi_pass_fmt]="🔑 Şifre:   %s"
+    [wifi_sec_fmt]="🔐 Güvenlik: %s"
+    [wifi_bssid_fmt]="🏷 BSSID:   %s"
+    [wifi_freq_fmt]="📻 Frekans: %s MHz (%s, %s)"
+    [wifi_bridge_fmt]="🌐 Bridge:  %s"
+    [wifi_clients_header]="👥 Bağlı cihazlar:"
+    [wifi_no_clients]="  (şu an aktif istemci yok)"
+
+    # ─── /upload ─────────────────────────────────────────────────────
+    [upload_usage_fmt]="Kullanım: /upload <hedef-yol>
+Örnek: /upload /sdcard/Download/
+
+Sonraki gönderdiğin dosya buraya kaydedilir (2dk içinde).
+İptal: /iptal"
+    [upload_waiting_fmt]="📥 Bekleniyor: sıradaki dosya '%s' altına kaydedilecek.
+İptal: /iptal"
+    [upload_getfile_failed_fmt]="❌ getFile başarısız: %s"
+    [upload_saved_fmt]="✅ Kaydedildi: %s (%d KB)"
+    [upload_download_failed]="❌ İndirme başarısız"
+
+    # ─── /at ─────────────────────────────────────────────────────────
+    [at_usage]="Kullanım: /at <AT komutu>
+Örnek: /at AT+CSQ
+Slot 1 için: /at slot=1 AT+CSQ
+Tehlikeli! Modem'i bozabilirsin, dikkatli kullan."
+    [at_no_sendat]="❌ sendat yok (UFI-TOOLS gerekli)"
+    [at_must_start_with]="❌ Komut 'AT' ile başlamalı"
+    [at_request_fmt]="📟 \$ %s (slot=%d)"
+    [at_empty_response]="(boş yanıt)"
+
+    # ─── /ramclean ───────────────────────────────────────────────────
+    [rc_list_header]="🔝 RAM Tüketim (top 15):"
+    [rc_mode_soft]="🧹 Soft Clean"
+    [rc_mode_aggressive]="🧨 Agresif Clean"
+    [rc_mode_nuke]="💣 NUKE Clean"
+    [rc_before_fmt]="Önce:  RAM %d MB | Swap %d MB"
+    [rc_after_fmt]="Sonra: RAM %d MB | Swap %d MB"
+    [rc_ram_gain_fmt]="✅ RAM kazanımı: +%d MB"
+    [rc_ram_loss_fmt]="⚠️ RAM azaldı: %d MB"
+    [rc_ram_same]="≈ RAM aynı"
+    [rc_swap_gain_fmt]="✅ Swap kazanımı: +%d MB"
+    [rc_killed_fmt]="🔥 Force-stop: %d app%s"
+    [rc_killed_more_fmt]="  ... ve %d tane daha"
+    [rc_modes_help]="Modlar:
+• /ramclean — soft (bilinen heavy)
+• /ramclean aggressive — 3rd-party hepsi
+• /ramclean nuke — agresif + trim-memory
+• /ramclean list — top 15 RAM"
+
+    # ─── /airplane ───────────────────────────────────────────────────
+    [airplane_no_sendat]="❌ sendat yok"
+    [airplane_on_fmt]="✈️ Uçak modu AÇIK
+%s"
+    [airplane_off_fmt]="📡 Uçak modu KAPALI
+%s"
+    [airplane_off_state]="✈️ Modem KAPALI (CFUN=0)"
+    [airplane_active_state]="📡 Modem aktif (CFUN=1)"
+    [airplane_on_state]="✈️ Uçak modu AÇIK (CFUN=4)"
+    [airplane_unknown_fmt]="Mod: %s"
+    [airplane_usage]="Kullanım: /airplane on|off|status"
+
+    # ─── /sms_send ───────────────────────────────────────────────────
+    [sms_usage]="Kullanım: /sms_send <numara> <mesaj>
+Örnek: /sms_send +905551234567 merhaba
+
+⚠️ Shell tabanlı SMS gönderimi sınırlı. AT+CMGS denenir, modem desteklerse çalışır."
+    [sms_no_sendat]="❌ sendat yok"
+    [sms_sent_fmt]="✅ SMS gönderildi (ya da kuyruğa alındı):
+to: %s
+msg: %s"
+    [sms_failed_fmt]="❌ Gönderim başarısız:
+%s
+
+Not: bu modem AT tabanlı SMS gönderimi desteklemiyor olabilir. UFI web UI'sını dene."
+
+    # ─── fmt_battery ─────────────────────────────────────────────────
+    [bat_unread]="🔋 Pil bilgisi alınamadı"
+    [bat_status_charging]="🔌 Şarj oluyor"
+    [bat_status_discharging]="🔋 Pil ile"
+    [bat_status_full]="✅ Dolu"
+    [bat_status_not_charging]="⏸ Şarj durduruldu"
+    [bat_header]="🔋 Pil Durumu"
+    [bat_charge_fmt]="Şarj: %%%d %s"
+    [bat_state_fmt]="Durum: %s"
+    [bat_temp_fmt]="Sıcaklık: %s"
+    [bat_volt_fmt]="Voltaj: %s"
+
+    # ─── handle_callback ─────────────────────────────────────────────
+    [cb_unauthorized]="Yetkisiz"
+    [cb_reboot_in_progress]="Yeniden başlatılıyor..."
+    [cb_reboot_msg]="🔁 Cihaz yeniden başlatılıyor... (~50sn)"
+    [cb_task_done]="Görev zaten tamamlandı"
+    [cb_cancelling]="İptal ediliyor..."
+    [cb_cancel_msg_fmt]="❌ İptal edildi: \$ %s
+
+%s"
+    [cb_no_output]="<çıktı yok>"
+    [cb_unknown]="Bilinmeyen action"
+
+    # ─── /iptal during IMEI captcha ──────────────────────────────────
+    [imei_cancel_done]="✓ IMEI sorgu iptal edildi"
+
+    # ─── misc inline (file ops, errors) ──────────────────────────────
+    [common_not_exists_fmt]="❌ Yok: %s"
+
+    # ─── poll_auto_alerts ────────────────────────────────────────────
+    [alert_temp_fmt]="🌡 UYARI: CPU sıcaklığı yüksek — %d°C
+(Eşik %d°C, %dsn boyunca tekrar uyarmaz)"
+    [alert_mem_fmt]="💾 UYARI: RAM çok düşük — %%%d kullanılabilir
+(%d MB)"
+    [alert_tunnel]="🔌 UYARI: Cloudflared tunnel çalışmıyor (process yok)"
+    [alert_sms_forward_fmt]="📨 Gelen SMS — %s
+👤 %s
+
+%s"
+
+    # ─── /komut completion ───────────────────────────────────────────
+    [komut_truncated_fmt]="
+... (truncated, toplam %d bayt)"
+    [komut_done_fmt]="✅ Tamamlandı: \$ %s
+
+%s%s"
+
+    # ─── Sohbet tetikleyicileri ──────────────────────────────────────
+    [chat_greeting_fmt]="%s, buradayım 👋"
+    [chat_naber_fmt]="%s! Durumum şöyle:
+
+%s"
+    [chat_time_fmt]="🕐 %s"
+    [chat_imisin_fmt]="İyiyim 🙂 (sıcaklık %s, uptime %s)"
+    [chat_thanks]="🤖 Rica ederim 👍"
+    [chat_morning_fmt]="Günaydın! ☀️ %s sürüyor şu an"
+    [chat_night]="Sana da 🌙 ben uyanık beklerim"
+
     # ─── /quiet_hours ────────────────────────────────────────────────
     [qh_active]="🔇 sessizdeyiz"
     [qh_inactive]="🔊 aktif değil"

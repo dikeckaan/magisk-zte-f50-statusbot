@@ -300,9 +300,8 @@ fmt_battery() {
     local temp=$(cat /sys/class/power_supply/battery/temp 2>/dev/null)
     local volt=$(cat /sys/class/power_supply/battery/voltage_now 2>/dev/null)
 
-    [ -z "$cap" ] && { echo "🔋 Pil bilgisi alınamadı"; return; }
+    [ -z "$cap" ] && { echo "${MSG[bat_unread]}"; return; }
 
-    local bar="▰▰▰▰▰▰▰▰▰▰"
     local filled=$((cap / 10))
     local pbar=""
     local i=0
@@ -311,20 +310,20 @@ fmt_battery() {
         i=$((i+1))
     done
 
-    local status_tr=""
+    local status_label=""
     case "$status" in
-        Charging)     status_tr="🔌 Şarj oluyor" ;;
-        Discharging)  status_tr="🔋 Pil ile" ;;
-        Full)         status_tr="✅ Dolu" ;;
-        Not\ charging) status_tr="⏸ Şarj durduruldu" ;;
-        *)            status_tr="$status" ;;
+        Charging)      status_label="${MSG[bat_status_charging]}" ;;
+        Discharging)   status_label="${MSG[bat_status_discharging]}" ;;
+        Full)          status_label="${MSG[bat_status_full]}" ;;
+        Not\ charging) status_label="${MSG[bat_status_not_charging]}" ;;
+        *)             status_label="$status" ;;
     esac
 
-    echo "🔋 Pil Durumu"
-    echo "Şarj: %$cap $pbar"
-    echo "Durum: $status_tr"
-    [ -n "$temp" ] && echo "Sıcaklık: $(awk -v t="$temp" 'BEGIN{printf "%.1f°C", t/10}')"
-    [ -n "$volt" ] && echo "Voltaj: $(awk -v v="$volt" 'BEGIN{printf "%.2fV", v/1000000}')"
+    echo "${MSG[bat_header]}"
+    printf "${MSG[bat_charge_fmt]}\n" "$cap" "$pbar"
+    printf "${MSG[bat_state_fmt]}\n" "$status_label"
+    [ -n "$temp" ] && printf "${MSG[bat_temp_fmt]}\n" "$(awk -v t="$temp" 'BEGIN{printf "%.1f°C", t/10}')"
+    [ -n "$volt" ] && printf "${MSG[bat_volt_fmt]}\n" "$(awk -v v="$volt" 'BEGIN{printf "%.2fV", v/1000000}')"
 }
 
 fmt_bytes() {
@@ -386,15 +385,10 @@ cmd_at() {
     # Generic AT runner. Args: optional "slot=N", then full AT command.
     local args="$*"
     if [ -z "$args" ]; then
-        cat <<'EOF'
-Kullanım: /at <AT komutu>
-Örnek: /at AT+CSQ
-Slot 1 için: /at slot=1 AT+CSQ
-Tehlikeli! Modem'i bozabilirsin, dikkatli kullan.
-EOF
+        echo "${MSG[at_usage]}"
         return
     fi
-    [ ! -x "$SENDAT" ] && { echo "❌ sendat yok (UFI-TOOLS gerekli)"; return; }
+    [ ! -x "$SENDAT" ] && { echo "${MSG[at_no_sendat]}"; return; }
 
     local slot=0
     case "$args" in
@@ -406,13 +400,13 @@ EOF
 
     case "$args" in
         AT*|at*) ;;
-        *) echo "❌ Komut 'AT' ile başlamalı"; return ;;
+        *) echo "${MSG[at_must_start_with]}"; return ;;
     esac
 
     local resp=$(at_cmd "$args" "$slot")
-    echo "📟 \$ $args (slot=$slot)"
+    tf at_request_fmt "$args" "$slot"
     echo
-    [ -z "$resp" ] && echo "(boş yanıt)" || echo "$resp"
+    [ -z "$resp" ] && echo "${MSG[at_empty_response]}" || echo "$resp"
 }
 
 edevlet_session_get_token_captcha() {
@@ -622,7 +616,7 @@ cmd_ramclean() {
 
     case "$arg1" in
         list|top)
-            echo "🔝 RAM Tüketim (top 15):"
+            echo "${MSG[rc_list_header]}"
             ps -A -o rss,name --sort=-rss 2>/dev/null | head -16 | awk 'NR==1 {next} {printf "  %s MB  %s\n", int($1/1024), $2}'
             return
             ;;
@@ -736,42 +730,38 @@ cmd_ramclean() {
 
     local mode_label
     case "$mode" in
-        soft) mode_label="🧹 Soft Clean" ;;
-        aggressive) mode_label="🧨 Agresif Clean" ;;
-        nuke) mode_label="💣 NUKE Clean" ;;
+        soft) mode_label="${MSG[rc_mode_soft]}" ;;
+        aggressive) mode_label="${MSG[rc_mode_aggressive]}" ;;
+        nuke) mode_label="${MSG[rc_mode_nuke]}" ;;
     esac
 
     printf "%s\n" "$mode_label"
     echo ""
-    printf "Önce:  RAM %d MB | Swap %d MB\n" "$((before_avail/1024))" "$((before_swap/1024))"
-    printf "Sonra: RAM %d MB | Swap %d MB\n" "$((after_avail/1024))" "$((after_swap/1024))"
+    printf "${MSG[rc_before_fmt]}\n" "$((before_avail/1024))" "$((before_swap/1024))"
+    printf "${MSG[rc_after_fmt]}\n"  "$((after_avail/1024))"  "$((after_swap/1024))"
     echo ""
     if [ "$freed_ram" -gt 0 ]; then
-        printf "✅ RAM kazanımı: +%d MB\n" "$((freed_ram/1024))"
+        printf "${MSG[rc_ram_gain_fmt]}\n" "$((freed_ram/1024))"
     elif [ "$freed_ram" -lt -1024 ]; then
-        printf "⚠️ RAM azaldı: %d MB\n" "$((freed_ram/1024))"
+        printf "${MSG[rc_ram_loss_fmt]}\n" "$((freed_ram/1024))"
     else
-        echo "≈ RAM aynı"
+        echo "${MSG[rc_ram_same]}"
     fi
-    [ "$freed_swap" -gt 0 ] && printf "✅ Swap kazanımı: +%d MB\n" "$((freed_swap/1024))"
+    [ "$freed_swap" -gt 0 ] && printf "${MSG[rc_swap_gain_fmt]}\n" "$((freed_swap/1024))"
 
     if [ "$killed_count" -gt 0 ]; then
         echo ""
-        echo "🔥 Force-stop: $killed_count app$killed_sample"
-        [ "$killed_count" -gt 8 ] && echo "  ... ve $((killed_count - 8)) tane daha"
+        printf "${MSG[rc_killed_fmt]}\n" "$killed_count" "$killed_sample"
+        [ "$killed_count" -gt 8 ] && printf "${MSG[rc_killed_more_fmt]}\n" "$((killed_count - 8))"
     fi
     echo ""
-    echo "Modlar:"
-    echo "• /ramclean — soft (bilinen heavy)"
-    echo "• /ramclean aggressive — 3rd-party hepsi"
-    echo "• /ramclean nuke — agresif + trim-memory"
-    echo "• /ramclean list — top 15 RAM"
+    echo "${MSG[rc_modes_help]}"
 }
 
 # ─── filesystem / inspection ──────────────────────────────────────────────
 cmd_ls() {
     local p="${1:-/}"
-    [ ! -e "$p" ] && { echo "❌ Yok: $p"; return; }
+    [ ! -e "$p" ] && { tf common_not_exists_fmt "$p"; return; }
     echo "📁 $p"
     ls -lah "$p" 2>&1 | head -50
 }
@@ -1323,20 +1313,14 @@ cmd_upload() {
     local chat_id="$1"
     local target_path="$2"
     if [ -z "$target_path" ]; then
-        tg_send "$chat_id" "Kullanım: /upload <hedef-yol>
-Örnek: /upload /sdcard/Download/
-
-Sonraki gönderdiğin dosya buraya kaydedilir (2dk içinde)."
+        tg_send "$chat_id" "${MSG[upload_usage_fmt]}"
         return
     fi
-    # If path ends with / or is existing dir → save with original filename
-    # Otherwise treat as full path (filename included)
     {
         echo "path=$target_path"
         echo "created=$(date +%s)"
     } > "$UPLOAD_STATE"
-    tg_send "$chat_id" "📥 Bekleniyor: sıradaki dosya '$target_path' altına kaydedilecek.
-İptal: /iptal"
+    tg_send "$chat_id" "$(printf "${MSG[upload_waiting_fmt]}" "$target_path")"
 }
 
 handle_upload_response() {
@@ -1358,7 +1342,7 @@ handle_upload_response() {
     file_path=$(echo "$resp" | "$JQ" -r '.result.file_path // empty' 2>/dev/null)
     if [ -z "$file_path" ]; then
         rm -f "$UPLOAD_STATE"
-        tg_send "$chat_id" "❌ getFile başarısız: $(echo "$resp" | head -c 200)"
+        tg_send "$chat_id" "$(printf "${MSG[upload_getfile_failed_fmt]}" "$(echo "$resp" | head -c 200)")"
         return 0
     fi
 
@@ -1377,10 +1361,10 @@ handle_upload_response() {
         local sz
         sz=$(stat -c %s "$final_path" 2>/dev/null || echo 0)
         rm -f "$UPLOAD_STATE"
-        tg_send "$chat_id" "✅ Kaydedildi: $final_path ($((sz/1024)) KB)"
+        tg_send "$chat_id" "$(printf "${MSG[upload_saved_fmt]}" "$final_path" "$((sz/1024))")"
     else
         rm -f "$UPLOAD_STATE"
-        tg_send "$chat_id" "❌ İndirme başarısız"
+        tg_send "$chat_id" "${MSG[upload_download_failed]}"
     fi
     return 0
 }
@@ -1813,35 +1797,34 @@ cmd_file() {
     local chat_id="$1"
     local path="$2"
     if [ -z "$path" ]; then
-        tg_send "$chat_id" "Kullanım: /file <yol>
-Örnek: /file /data/statusbot/bot.log
-Maks 50 MB (Telegram limiti)"
+        tg_send "$chat_id" "${MSG[file_usage]}"
         return
     fi
     if [ ! -f "$path" ]; then
-        tg_send "$chat_id" "❌ Dosya bulunamadı: $path"
+        tg_send "$chat_id" "$(printf "${MSG[file_not_found_fmt]}" "$path")"
         return
     fi
     local size
     size=$(stat -c %s "$path" 2>/dev/null || echo 0)
     if [ "$size" -eq 0 ]; then
-        tg_send "$chat_id" "⚠️ Dosya boş: $path"
+        tg_send "$chat_id" "$(printf "${MSG[file_empty_fmt]}" "$path")"
         return
     fi
     if [ "$size" -gt 52428800 ]; then
-        tg_send "$chat_id" "❌ Çok büyük: $((size/1048576)) MB (limit 50 MB).
-Bölmek için: split -b 49M $path /tmp/part_"
+        tg_send "$chat_id" "$(printf "${MSG[file_too_big_fmt]}" "$((size/1048576))" "$path")"
         return
     fi
-    tg_send "$chat_id" "📤 Gönderiliyor ($(awk -v s=$size 'BEGIN{printf \"%.1f KB\", s/1024}'))..." >/dev/null
+    local size_kb
+    size_kb=$(awk -v s=$size 'BEGIN{printf "%.1f KB", s/1024}')
+    tg_send "$chat_id" "$(printf "${MSG[file_sending_fmt]}" "$size_kb")" >/dev/null
     local resp
-    resp=$(tg_send_document "$chat_id" "$path" "📄 $(basename "$path")")
+    resp=$(tg_send_document "$chat_id" "$path" "$(printf "${MSG[file_caption_fmt]}" "$(basename "$path")")")
     local ok
     ok=$(echo "$resp" | "$JQ" -r '.ok // empty' 2>/dev/null)
     if [ "$ok" != "true" ]; then
         local err
-        err=$(echo "$resp" | "$JQ" -r '.description // "bilinmeyen"' 2>/dev/null)
-        tg_send "$chat_id" "❌ Telegram reddetti: $err"
+        err=$(echo "$resp" | "$JQ" -r ".description // \"${MSG[file_unknown_error]}\"" 2>/dev/null)
+        tg_send "$chat_id" "$(printf "${MSG[file_tg_rejected_fmt]}" "$err")"
     fi
 }
 
@@ -1849,22 +1832,20 @@ cmd_screenshot() {
     local chat_id="$1"
     local out="/data/local/tmp/.statusbot_ss.png"
     rm -f "$out"
-    # Try screencap (built-in on Android)
     if command -v screencap >/dev/null 2>&1; then
         screencap -p "$out" 2>/dev/null
     fi
     if [ ! -s "$out" ]; then
-        tg_send "$chat_id" "❌ Screencap başarısız (cihaz uyuyor olabilir veya secure window'da)"
+        tg_send "$chat_id" "${MSG[ss_failed]}"
         return
     fi
-    tg_send "$chat_id" "📸 Çekildi ($(stat -c %s "$out" 2>/dev/null) byte), gönderiliyor..." >/dev/null
-    # As photo (compressed) or document (original quality)? Use document for clarity
-    tg_send_photo "$chat_id" "$out" "📸 Ekran görüntüsü — $(date '+%H:%M:%S')"
+    tg_send "$chat_id" "$(printf "${MSG[ss_taken_fmt]}" "$(stat -c %s "$out" 2>/dev/null)")" >/dev/null
+    tg_send_photo "$chat_id" "$out" "$(printf "${MSG[ss_caption_fmt]}" "$(date '+%H:%M:%S')")"
     rm -f "$out"
 }
 
 cmd_wifi() {
-    echo "📶 WiFi (Hotspot)"
+    echo "${MSG[wifi_header]}"
     echo
     # Find hostapd config — ZTE F50 uses /data/vendor/wifi/hostapd/hostapd_wlan0.conf
     local conf
@@ -1930,25 +1911,25 @@ cmd_wifi() {
             *) std_label="legacy" ;;
         esac
 
-        [ -n "$ssid" ]  && echo "📡 SSID:    $ssid"
-        [ -n "$pass" ]  && echo "🔑 Şifre:   $pass"
-        [ -n "$wpa_ver" ] && echo "🔐 Güvenlik: $wpa_ver"
-        [ -n "$bssid" ] && echo "🏷 BSSID:   $bssid"
-        [ -n "$actual_freq" ] && echo "📻 Frekans: $actual_freq MHz ($band, $std_label)"
+        [ -n "$ssid" ]  && tf wifi_ssid_fmt "$ssid"
+        [ -n "$pass" ]  && tf wifi_pass_fmt "$pass"
+        [ -n "$wpa_ver" ] && tf wifi_sec_fmt "$wpa_ver"
+        [ -n "$bssid" ] && tf wifi_bssid_fmt "$bssid"
+        [ -n "$actual_freq" ] && printf "${MSG[wifi_freq_fmt]}\n" "$actual_freq" "$band" "$std_label"
         echo
     else
-        echo "⚠️ hostapd.conf bulunamadı"
+        echo "${MSG[wifi_no_conf]}"
         echo
     fi
 
     # Bridge IP
     local br_ip
     br_ip=$(ip -4 -o addr show br0 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
-    [ -n "$br_ip" ] && echo "🌐 Bridge:  $br_ip"
+    [ -n "$br_ip" ] && tf wifi_bridge_fmt "$br_ip"
     echo
 
     # Connected clients from ARP (filter br0 + valid MACs)
-    echo "👥 Bağlı cihazlar:"
+    echo "${MSG[wifi_clients_header]}"
     local count=0
     if [ -r /proc/net/arp ]; then
         while IFS= read -r line; do
@@ -1963,7 +1944,7 @@ cmd_wifi() {
             count=$((count+1))
         done < /proc/net/arp
     fi
-    [ "$count" -eq 0 ] && echo "  (şu an aktif istemci yok)"
+    [ "$count" -eq 0 ] && echo "${MSG[wifi_no_clients]}"
 }
 
 cmd_sms_send() {
@@ -1974,29 +1955,19 @@ cmd_sms_send() {
     num=$(echo "$args" | awk '{print $1}')
     msg=$(echo "$args" | awk '{$1=""; sub(/^ /,""); print}')
     if [ -z "$num" ] || [ -z "$msg" ]; then
-        tg_send "$chat_id" "Kullanım: /sms_send <numara> <mesaj>
-Örnek: /sms_send +905551234567 merhaba
-
-⚠️ Shell tabanlı SMS gönderimi sınırlı. AT+CMGS denenir, modem desteklerse çalışır."
+        tg_send "$chat_id" "${MSG[sms_usage]}"
         return
     fi
     if [ ! -x "$SENDAT" ]; then
-        tg_send "$chat_id" "❌ sendat yok"
+        tg_send "$chat_id" "${MSG[sms_no_sendat]}"
         return
     fi
-    # Set text mode first
     "$SENDAT" -c "AT+CMGF=1" -n 0 >/dev/null 2>&1
-    # CMGS with Ctrl-Z (0x1A) terminator
     local resp
     resp=$(printf 'AT+CMGS="%s"\r\n%s\x1A' "$num" "$msg" | xargs -0 -I{} "$SENDAT" -c "{}" -n 0 2>&1)
     case "$resp" in
-        *OK*|*CMGS:*) tg_send "$chat_id" "✅ SMS gönderildi (ya da kuyruğa alındı):
-to: $num
-msg: $msg" ;;
-        *) tg_send "$chat_id" "❌ Gönderim başarısız:
-$resp
-
-Not: bu modem AT tabanlı SMS gönderimi desteklemiyor olabilir. UFI web UI'sını dene." ;;
+        *OK*|*CMGS:*) tg_send "$chat_id" "$(printf "${MSG[sms_sent_fmt]}" "$num" "$msg")" ;;
+        *)            tg_send "$chat_id" "$(printf "${MSG[sms_failed_fmt]}" "$resp")" ;;
     esac
 }
 
@@ -2559,27 +2530,25 @@ EOF
 }
 
 cmd_airplane() {
-    [ ! -x "$SENDAT" ] && { echo "❌ sendat yok"; return; }
+    [ ! -x "$SENDAT" ] && { echo "${MSG[airplane_no_sendat]}"; return; }
     local action="$1"
     case "$action" in
         on|açik|açık|kapat)
             local resp=$(at_cmd "AT+CFUN=4")
-            echo "✈️ Uçak modu AÇIK
-$resp" ;;
+            printf "${MSG[airplane_on_fmt]}\n" "$resp" ;;
         off|kapali|kapalı|aç)
             local resp=$(at_cmd "AT+CFUN=1")
-            echo "📡 Uçak modu KAPALI
-$resp" ;;
+            printf "${MSG[airplane_off_fmt]}\n" "$resp" ;;
         ""|status|durum)
             local resp=$(at_cmd "AT+CFUN?")
             local mode=$(echo "$resp" | sed -n 's/.*+CFUN: *\([0-9]*\).*/\1/p')
             case "$mode" in
-                0) echo "✈️ Modem KAPALI (CFUN=0)" ;;
-                1) echo "📡 Modem aktif (CFUN=1)" ;;
-                4) echo "✈️ Uçak modu AÇIK (CFUN=4)" ;;
-                *) echo "Mod: $mode" ;;
+                0) echo "${MSG[airplane_off_state]}" ;;
+                1) echo "${MSG[airplane_active_state]}" ;;
+                4) echo "${MSG[airplane_on_state]}" ;;
+                *) tf airplane_unknown_fmt "$mode" ;;
             esac ;;
-        *) echo "Kullanım: /airplane on|off|status" ;;
+        *) echo "${MSG[airplane_usage]}" ;;
     esac
 }
 
@@ -3229,8 +3198,7 @@ poll_auto_alerts() {
         temp_c=$((temp_raw / 1000))
         if [ "$temp_c" -ge "$ALERT_TEMP_C" ]; then
             if ! alert_fired_recently "temp_high"; then
-                tg_send "$OWNER" "🌡 UYARI: CPU sıcaklığı yüksek — ${temp_c}°C
-(Eşik ${ALERT_TEMP_C}°C, ${ALERT_REARM_SEC}sn boyunca tekrar uyarmaz)" >/dev/null
+                tg_send "$OWNER" "$(printf "${MSG[alert_temp_fmt]}" "$temp_c" "$ALERT_TEMP_C" "$ALERT_REARM_SEC")" >/dev/null
                 alert_mark "temp_high"
                 log "ALERT: temp=${temp_c}C"
             fi
@@ -3242,8 +3210,9 @@ poll_auto_alerts() {
     mem_avail_pct=$(awk '/^MemTotal:/{t=$2} /^MemAvailable:/{a=$2} END {if (t>0) printf "%d", a*100/t}' /proc/meminfo)
     if [ -n "$mem_avail_pct" ] && [ "$mem_avail_pct" -lt "$ALERT_MEM_PCT" ]; then
         if ! alert_fired_recently "mem_low"; then
-            tg_send "$OWNER" "💾 UYARI: RAM çok düşük — %${mem_avail_pct} kullanılabilir
-($(awk '/^MemAvailable:/{printf "%.0f", $2/1024}' /proc/meminfo) MB)" >/dev/null
+            local mem_mb
+            mem_mb=$(awk '/^MemAvailable:/{printf "%.0f", $2/1024}' /proc/meminfo)
+            tg_send "$OWNER" "$(printf "${MSG[alert_mem_fmt]}" "$mem_avail_pct" "$mem_mb")" >/dev/null
             alert_mark "mem_low"
             log "ALERT: mem_avail=${mem_avail_pct}%"
         fi
@@ -3252,7 +3221,7 @@ poll_auto_alerts() {
     # Cloudflared tunnel down
     if ! pgrep -f /system/bin/cloudflared >/dev/null 2>&1; then
         if ! alert_fired_recently "tunnel_down"; then
-            tg_send "$OWNER" "🔌 UYARI: Cloudflared tunnel çalışmıyor (process yok)" >/dev/null
+            tg_send "$OWNER" "${MSG[alert_tunnel]}" >/dev/null
             alert_mark "tunnel_down"
             log "ALERT: tunnel_down"
         fi
@@ -3273,11 +3242,8 @@ poll_tasks() {
         local cmd=$(cat "$TASK_DIR/${task_id}.cmd" 2>/dev/null)
         local size=$(stat -c %s "$TASK_DIR/${task_id}.out" 2>/dev/null || echo 0)
         local truncated=""
-        [ "$size" -gt "$KOMUT_MAX_OUTPUT" ] && truncated="
-... (truncated, toplam $size bayt)"
-        tg_edit "$chat_id" "$bot_msg_id" "✅ Tamamlandı: \$ $cmd
-
-$out$truncated"
+        [ "$size" -gt "$KOMUT_MAX_OUTPUT" ] && truncated=$(printf "${MSG[komut_truncated_fmt]}" "$size")
+        tg_edit "$chat_id" "$bot_msg_id" "$(printf "${MSG[komut_done_fmt]}" "$cmd" "$out" "$truncated")"
         rm -f "$TASK_DIR/${task_id}.out" "$TASK_DIR/${task_id}.pid" "$TASK_DIR/${task_id}.cmd" "$TASK_DIR/${task_id}.meta" "$TASK_DIR/${task_id}.done"
         log "komut done: task=$task_id"
     done
@@ -3317,14 +3283,14 @@ handle_callback() {
 
     # Owner check
     if [ "$from_chat" != "$OWNER" ]; then
-        tg_answer_callback "$cb_id" "Yetkisiz"
+        tg_answer_callback "$cb_id" "${MSG[cb_unauthorized]}"
         return
     fi
 
     case "$data" in
         reboot_now)
-            tg_answer_callback "$cb_id" "Yeniden başlatılıyor..."
-            tg_edit "$from_chat" "$message_id" "🔁 Cihaz yeniden başlatılıyor... (~50sn)"
+            tg_answer_callback "$cb_id" "${MSG[cb_reboot_in_progress]}"
+            tg_edit "$from_chat" "$message_id" "${MSG[cb_reboot_msg]}"
             log "reboot_now triggered via inline button"
             ( sleep 2; /system/bin/reboot ) &
             return
@@ -3333,12 +3299,11 @@ handle_callback() {
             local task_id="${data#cancel:}"
             local metafile="$TASK_DIR/${task_id}.meta"
             local donefile="$TASK_DIR/${task_id}.done"
-            # Race-safe: if task already done or cleaned up, just acknowledge
             if [ -f "$donefile" ] || [ ! -f "$metafile" ]; then
-                tg_answer_callback "$cb_id" "Görev zaten tamamlandı"
+                tg_answer_callback "$cb_id" "${MSG[cb_task_done]}"
                 return
             fi
-            tg_answer_callback "$cb_id" "İptal ediliyor..."
+            tg_answer_callback "$cb_id" "${MSG[cb_cancelling]}"
             . "$metafile" 2>/dev/null
             local pid=$(cat "$TASK_DIR/${task_id}.pid" 2>/dev/null)
             if [ -n "$pid" ]; then
@@ -3350,14 +3315,12 @@ handle_callback() {
             fi
             local out=$(head -c "$KOMUT_MAX_OUTPUT" "$TASK_DIR/${task_id}.out" 2>/dev/null)
             local cmd=$(cat "$TASK_DIR/${task_id}.cmd" 2>/dev/null)
-            tg_edit "$from_chat" "$message_id" "❌ İptal edildi: \$ $cmd
-
-${out:-<çıktı yok>}"
+            tg_edit "$from_chat" "$message_id" "$(printf "${MSG[cb_cancel_msg_fmt]}" "$cmd" "${out:-${MSG[cb_no_output]}}")"
             rm -f "$TASK_DIR/${task_id}.out" "$TASK_DIR/${task_id}.pid" "$TASK_DIR/${task_id}.cmd" "$TASK_DIR/${task_id}.meta" "$TASK_DIR/${task_id}.done"
             log "komut cancelled: task=$task_id"
             ;;
         *)
-            tg_answer_callback "$cb_id" "Bilinmeyen action"
+            tg_answer_callback "$cb_id" "${MSG[cb_unknown]}"
             ;;
     esac
 }
@@ -3380,7 +3343,7 @@ dispatch() {
             case "$text" in
                 /iptal|/cancel)
                     rm -f "$pending" "$DATADIR/.edevlet_cookies" "$DATADIR/.captcha.png"
-                    tg_send "$chat_id" "✓ IMEI sorgu iptal edildi" "$msg_id" >/dev/null
+                    tg_send "$chat_id" "${MSG[imei_cancel_done]}" "$msg_id" >/dev/null
                     return ;;
                 /*) ;;  # Other commands take precedence
                 *)
@@ -3511,21 +3474,19 @@ dispatch() {
             local lc=$(echo "$text" | tr '[:upper:]' '[:lower:]' | tr -d ' .,!?')
             case "$lc" in
                 selam|selammm*|merhaba|sa|selamünaleyküm|selamunaleykum|sb|hi|hello)
-                    reply="$(greeting), buradayım 👋" ;;
+                    reply=$(printf "${MSG[chat_greeting_fmt]}" "$(greeting)") ;;
                 naber|nbr|nasilsin|nasıl|nasılsın|nasilbakalim)
-                    reply="$(greeting)! Durumum şöyle:
-
-$(cmd_status)" ;;
+                    reply=$(printf "${MSG[chat_naber_fmt]}" "$(greeting)" "$(cmd_status)") ;;
                 saat|saatkac|saatkaç)
-                    reply="🕐 $(date '+%H:%M:%S — %d %B %Y')" ;;
+                    reply=$(printf "${MSG[chat_time_fmt]}" "$(date '+%H:%M:%S — %d %B %Y')") ;;
                 iyimisin|iyimi|naptın|naptin|nicesin)
-                    reply="İyiyim 🙂 (sıcaklık $(fmt_temp), uptime $(fmt_uptime))" ;;
+                    reply=$(printf "${MSG[chat_imisin_fmt]}" "$(fmt_temp)" "$(fmt_uptime)") ;;
                 teşekkür*|tesekkur*|tşk|tsk|sağol*|sagol*|saol*|thanks|thx)
-                    reply="🤖 Rica ederim 👍" ;;
+                    reply="${MSG[chat_thanks]}" ;;
                 günaydın*|gunaydin*|hayırlısabahlar*)
-                    reply="Günaydın! ☀️ $(fmt_uptime) sürüyor şu an" ;;
+                    reply=$(printf "${MSG[chat_morning_fmt]}" "$(fmt_uptime)") ;;
                 iyigeceler|iyiakşamlar|iyiaksamlar|hayırlıgeceler)
-                    reply="Sana da 🌙 ben uyanık beklerim" ;;
+                    reply="${MSG[chat_night]}" ;;
                 *) return ;;
             esac
             ;;

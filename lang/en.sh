@@ -165,6 +165,162 @@ Load guide:
   < %d.0 = headroom available
   > %d.0 = queue, slowdowns possible"
 
+    # ─── /file ───────────────────────────────────────────────────────
+    [file_usage]="Usage: /file <path>
+Example: /file /data/statusbot/bot.log
+Max 50 MB (Telegram limit)"
+    [file_not_found_fmt]="❌ File not found: %s"
+    [file_empty_fmt]="⚠️ File is empty: %s"
+    [file_too_big_fmt]="❌ Too big: %d MB (limit 50 MB).
+To split: split -b 49M %s /tmp/part_"
+    [file_sending_fmt]="📤 Sending (%s)…"
+    [file_unknown_error]="unknown"
+    [file_tg_rejected_fmt]="❌ Telegram rejected: %s"
+    [file_caption_fmt]="📄 %s"
+
+    # ─── /screenshot ─────────────────────────────────────────────────
+    [ss_failed]="❌ screencap failed (device may be asleep or in a secure window)"
+    [ss_taken_fmt]="📸 Captured (%d bytes), sending…"
+    [ss_caption_fmt]="📸 Screenshot — %s"
+
+    # ─── /wifi ───────────────────────────────────────────────────────
+    [wifi_header]="📶 WiFi (Hotspot)"
+    [wifi_no_conf]="⚠️ hostapd.conf not found"
+    [wifi_ssid_fmt]="📡 SSID:    %s"
+    [wifi_pass_fmt]="🔑 Password: %s"
+    [wifi_sec_fmt]="🔐 Security: %s"
+    [wifi_bssid_fmt]="🏷 BSSID:   %s"
+    [wifi_freq_fmt]="📻 Frequency: %s MHz (%s, %s)"
+    [wifi_bridge_fmt]="🌐 Bridge:  %s"
+    [wifi_clients_header]="👥 Connected clients:"
+    [wifi_no_clients]="  (no active client right now)"
+
+    # ─── /upload ─────────────────────────────────────────────────────
+    [upload_usage_fmt]="Usage: /upload <target-path>
+Example: /upload /sdcard/Download/
+
+The next file you send within 2 minutes will be saved at this path.
+Cancel: /iptal"
+    [upload_waiting_fmt]="📥 Waiting: the next file will be saved under '%s'.
+Cancel: /iptal"
+    [upload_getfile_failed_fmt]="❌ getFile failed: %s"
+    [upload_saved_fmt]="✅ Saved: %s (%d KB)"
+    [upload_download_failed]="❌ Download failed"
+
+    # ─── /at ─────────────────────────────────────────────────────────
+    [at_usage]="Usage: /at <AT command>
+Example: /at AT+CSQ
+For slot 1: /at slot=1 AT+CSQ
+Dangerous! You can break the modem — use carefully."
+    [at_no_sendat]="❌ sendat not available (UFI-TOOLS required)"
+    [at_must_start_with]="❌ Command must start with 'AT'"
+    [at_request_fmt]="📟 \$ %s (slot=%d)"
+    [at_empty_response]="(empty response)"
+
+    # ─── /ramclean ───────────────────────────────────────────────────
+    [rc_list_header]="🔝 RAM Usage (top 15):"
+    [rc_mode_soft]="🧹 Soft Clean"
+    [rc_mode_aggressive]="🧨 Aggressive Clean"
+    [rc_mode_nuke]="💣 NUKE Clean"
+    [rc_before_fmt]="Before: RAM %d MB | Swap %d MB"
+    [rc_after_fmt]="After:  RAM %d MB | Swap %d MB"
+    [rc_ram_gain_fmt]="✅ RAM gain: +%d MB"
+    [rc_ram_loss_fmt]="⚠️ RAM dropped: %d MB"
+    [rc_ram_same]="≈ RAM unchanged"
+    [rc_swap_gain_fmt]="✅ Swap gain: +%d MB"
+    [rc_killed_fmt]="🔥 Force-stop: %d app(s)%s"
+    [rc_killed_more_fmt]="  … and %d more"
+    [rc_modes_help]="Modes:
+• /ramclean — soft (known-heavy)
+• /ramclean aggressive — all 3rd-party
+• /ramclean nuke — aggressive + trim-memory
+• /ramclean list — top 15 RAM"
+
+    # ─── /airplane ───────────────────────────────────────────────────
+    [airplane_no_sendat]="❌ sendat not available"
+    [airplane_on_fmt]="✈️ Airplane mode ON
+%s"
+    [airplane_off_fmt]="📡 Airplane mode OFF
+%s"
+    [airplane_off_state]="✈️ Modem OFF (CFUN=0)"
+    [airplane_active_state]="📡 Modem active (CFUN=1)"
+    [airplane_on_state]="✈️ Airplane mode ON (CFUN=4)"
+    [airplane_unknown_fmt]="Mode: %s"
+    [airplane_usage]="Usage: /airplane on|off|status"
+
+    # ─── /sms_send ───────────────────────────────────────────────────
+    [sms_usage]="Usage: /sms_send <phone> <message>
+Example: /sms_send +905551234567 hi
+
+⚠️ Shell-based SMS sending is limited. AT+CMGS is attempted; works only if the modem supports it."
+    [sms_no_sendat]="❌ sendat not available"
+    [sms_sent_fmt]="✅ SMS sent (or queued):
+to: %s
+msg: %s"
+    [sms_failed_fmt]="❌ Send failed:
+%s
+
+Note: this modem may not support AT-based SMS sending. Try the UFI web UI."
+
+    # ─── fmt_battery ─────────────────────────────────────────────────
+    [bat_unread]="🔋 Battery info unavailable"
+    [bat_status_charging]="🔌 Charging"
+    [bat_status_discharging]="🔋 On battery"
+    [bat_status_full]="✅ Full"
+    [bat_status_not_charging]="⏸ Charge paused"
+    [bat_header]="🔋 Battery Status"
+    [bat_charge_fmt]="Charge: %d%% %s"
+    [bat_state_fmt]="State: %s"
+    [bat_temp_fmt]="Temperature: %s"
+    [bat_volt_fmt]="Voltage: %s"
+
+    # ─── handle_callback ─────────────────────────────────────────────
+    [cb_unauthorized]="Unauthorized"
+    [cb_reboot_in_progress]="Rebooting…"
+    [cb_reboot_msg]="🔁 Device rebooting… (~50 s)"
+    [cb_task_done]="Task already finished"
+    [cb_cancelling]="Cancelling…"
+    [cb_cancel_msg_fmt]="❌ Cancelled: \$ %s
+
+%s"
+    [cb_no_output]="<no output>"
+    [cb_unknown]="Unknown action"
+
+    # ─── /iptal during IMEI captcha ──────────────────────────────────
+    [imei_cancel_done]="✓ IMEI query cancelled"
+
+    # ─── misc inline (file ops, errors) ──────────────────────────────
+    [common_not_exists_fmt]="❌ Doesn't exist: %s"
+
+    # ─── poll_auto_alerts ────────────────────────────────────────────
+    [alert_temp_fmt]="🌡 WARNING: CPU temperature high — %d°C
+(Threshold %d°C, won't re-warn for %d s)"
+    [alert_mem_fmt]="💾 WARNING: RAM very low — %d%% available
+(%d MB)"
+    [alert_tunnel]="🔌 WARNING: Cloudflared tunnel is down (no process)"
+    [alert_sms_forward_fmt]="📨 Incoming SMS — %s
+👤 %s
+
+%s"
+
+    # ─── /komut completion ───────────────────────────────────────────
+    [komut_truncated_fmt]="
+... (truncated, %d bytes total)"
+    [komut_done_fmt]="✅ Done: \$ %s
+
+%s%s"
+
+    # ─── Chat triggers (informal Turkish patterns matched, translated reply) ─
+    [chat_greeting_fmt]="%s, here I am 👋"
+    [chat_naber_fmt]="%s! Here's my status:
+
+%s"
+    [chat_time_fmt]="🕐 %s"
+    [chat_imisin_fmt]="I'm fine 🙂 (temp %s, uptime %s)"
+    [chat_thanks]="🤖 You're welcome 👍"
+    [chat_morning_fmt]="Good morning! ☀️ %s elapsed so far"
+    [chat_night]="You too 🌙 I'll stay awake"
+
     # ─── /quiet_hours ────────────────────────────────────────────────
     [qh_active]="🔇 currently quiet"
     [qh_inactive]="🔊 not active right now"
