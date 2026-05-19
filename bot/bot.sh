@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.15.1"
+BOT_VERSION="v2.15.2"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -904,7 +904,7 @@ lookup_module_url() {
 install_module_from_url() {
     local mod_id="$1"
     local update_url="$2"
-    local remote_resp remote_ver remote_vcode zipurl tmp_zip install_out
+    local remote_resp remote_ver remote_vcode zipurl remote_sha tmp_zip install_out
 
     if is_module_installed "$mod_id"; then
         tf install_already_present_fmt "$mod_id"
@@ -919,6 +919,7 @@ install_module_from_url() {
     remote_ver=$(echo   "$remote_resp" | "$JQ" -r '.version // empty'     2>/dev/null)
     remote_vcode=$(echo "$remote_resp" | "$JQ" -r '.versionCode // empty' 2>/dev/null)
     zipurl=$(echo       "$remote_resp" | "$JQ" -r '.zipUrl // empty'      2>/dev/null)
+    remote_sha=$(echo   "$remote_resp" | "$JQ" -r '.sha256 // empty'      2>/dev/null)
     if [ -z "$zipurl" ] || [ -z "$remote_ver" ]; then
         tf install_parse_failed_fmt "$mod_id"; return 3
     fi
@@ -930,6 +931,23 @@ install_module_from_url() {
     local size=$(stat -c %s "$tmp_zip" 2>/dev/null || echo 0)
     if [ "$size" -lt 1024 ]; then
         rm -f "$tmp_zip"; tf install_download_failed_fmt "$mod_id"; return 4
+    fi
+
+    # Integrity check. update.json's "sha256" field is added by the
+    # reusable release workflow (f50-magisk-modules/.github/workflows/
+    # release-module.yml). Older releases pre-dating that workflow have
+    # no sha256 field — we skip verification then with a warning.
+    if [ -n "$remote_sha" ]; then
+        local actual_sha
+        actual_sha=$(sha256sum "$tmp_zip" 2>/dev/null | awk '{print $1}')
+        if [ -z "$actual_sha" ] || [ "$actual_sha" != "$remote_sha" ]; then
+            rm -f "$tmp_zip"
+            tf install_sha_mismatch_fmt "$mod_id" "$remote_sha" "${actual_sha:-<empty>}"
+            return 6
+        fi
+        tf install_sha_ok_fmt "$mod_id"
+    else
+        tf install_sha_missing_fmt "$mod_id"
     fi
 
     tf install_installing_fmt "$mod_id"

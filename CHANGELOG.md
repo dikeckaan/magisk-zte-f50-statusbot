@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.15.2 — 2026-05-19
+- **SHA-256 integrity verification** for `/install_module` and (by
+  extension) the `/adguard install` / `/traffic_history install`
+  shortcuts. `install_module_from_url` now reads `sha256` from the
+  module's `update.json`, computes `sha256sum` of the downloaded zip,
+  and aborts the install on mismatch instead of running `magisk
+  --install-module` on a corrupted/MITM'd file.
+- Older release JSONs that don't have the `sha256` field (pre-callable-
+  workflow releases) get a warning line and proceed without
+  verification — graceful degradation, no hard fail on legacy releases.
+- 3 new MSG keys in en.sh + tr.sh: `install_sha_ok_fmt`,
+  `install_sha_missing_fmt`, `install_sha_mismatch_fmt`.
+- The new reusable release workflow at
+  [f50-magisk-modules/.github/workflows/release-module.yml](https://github.com/dikeckaan/f50-magisk-modules/blob/main/.github/workflows/release-module.yml)
+  populates `sha256` on every new release, so future bumps gain
+  integrity by default.
+
 ## v2.15.1 — 2026-05-19  ⚠ Hotfix
 - **CRITICAL FIX**: v2.15.0 was broken. The Phase 3 sed/perl substitution
   that replaced ~37 `echo "$X" | awk '{print $1}'` calls with the new
