@@ -1,5 +1,20 @@
 # Changelog
 
+## v2.17.0 — 2026-05-19
+- **sms-cmd integration** — companion offline SMS backup channel
+  module (separate repo, v1.0.0) lets an authorised phone number SMS
+  the device commands when Telegram is unreachable. This release adds
+  `/sms_cmd` to manage the channel:
+  - `/sms_cmd` or `/sms_cmd status` — show whitelist size, secret-set
+    state, allowed commands, event count
+  - `/sms_cmd secret set <new>` — rotate the shared secret
+  - `/sms_cmd add <phone>` — whitelist a number (E.164 or local form,
+    normalised internally)
+  - `/sms_cmd remove <phone>` — un-whitelist
+  - `/sms_cmd list` — show whitelist
+  - `/sms_cmd log` — recent SMS command events
+- Phase 3 of the "cep çakısı" plan ships.
+
 ## v2.16.1 — 2026-05-19  ⚠ Hotfix
 - **`/locate` switched to BeaconDB**. Mozilla Location Service was shut
   down in September 2024 — the endpoint returns HTTP 404 now. Replaced

@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.16.1"
+BOT_VERSION="v2.17.0"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -3115,6 +3115,77 @@ cmd_locate() {
     tf locate_result_fmt "$lat" "$lng" "${acc:-?}" "$lat" "$lng"
 }
 
+# ─── /sms_cmd — manage the sms-cmd offline backup channel ───────────────
+SMS_CMD_CONFIG=/data/sms-cmd/config.json
+
+sms_cmd_present() {
+    [ -d /data/adb/modules/sms-cmd ] || [ -d /data/adb/modules_update/sms-cmd ]
+}
+
+cmd_sms_cmd() {
+    if ! sms_cmd_present; then
+        say "${MSG[smscmd_not_installed]}"
+        return
+    fi
+    if [ ! -r "$SMS_CMD_CONFIG" ]; then
+        say "${MSG[smscmd_no_config]}"
+        return
+    fi
+    local sub=$(first_word "$1" | tr '[:upper:]' '[:lower:]')
+    local arg=$(nth_word 2 "$1")
+    local arg3=$(nth_word 3 "$1")
+    case "$sub" in
+        ""|status)
+            local secret_set whitelist_n allowed events_n
+            secret_set=$("$JQ" -r 'if .secret == "CHANGE_ME_KAAN_PLEASE" then "NO" else "YES" end' "$SMS_CMD_CONFIG")
+            whitelist_n=$("$JQ" -r '.whitelist | length' "$SMS_CMD_CONFIG")
+            allowed=$("$JQ" -r '.allowed_commands | join(", ")' "$SMS_CMD_CONFIG")
+            events_n=$(wc -l < /data/sms-cmd/events.log 2>/dev/null || echo 0)
+            tf smscmd_status_fmt "$secret_set" "$whitelist_n" "$allowed" "$events_n"
+            ;;
+        secret)
+            if [ "$arg" = "set" ] && [ -n "$arg3" ]; then
+                "$JQ" --arg s "$arg3" '.secret = $s' "$SMS_CMD_CONFIG" > "$SMS_CMD_CONFIG.tmp" \
+                    && mv "$SMS_CMD_CONFIG.tmp" "$SMS_CMD_CONFIG" && chmod 600 "$SMS_CMD_CONFIG"
+                say "${MSG[smscmd_secret_set]}"
+            else
+                say "${MSG[smscmd_secret_usage]}"
+            fi
+            ;;
+        add)
+            if [ -n "$arg" ]; then
+                "$JQ" --arg p "$arg" '.whitelist += [$p] | .whitelist |= unique' "$SMS_CMD_CONFIG" \
+                    > "$SMS_CMD_CONFIG.tmp" && mv "$SMS_CMD_CONFIG.tmp" "$SMS_CMD_CONFIG" \
+                    && chmod 600 "$SMS_CMD_CONFIG"
+                tf smscmd_added_fmt "$arg"
+            else
+                say "${MSG[smscmd_add_usage]}"
+            fi
+            ;;
+        remove|rm|del)
+            if [ -n "$arg" ]; then
+                "$JQ" --arg p "$arg" '.whitelist -= [$p]' "$SMS_CMD_CONFIG" \
+                    > "$SMS_CMD_CONFIG.tmp" && mv "$SMS_CMD_CONFIG.tmp" "$SMS_CMD_CONFIG" \
+                    && chmod 600 "$SMS_CMD_CONFIG"
+                tf smscmd_removed_fmt "$arg"
+            else
+                say "${MSG[smscmd_remove_usage]}"
+            fi
+            ;;
+        list)
+            say "${MSG[smscmd_whitelist_header]}"
+            "$JQ" -r '.whitelist[]' "$SMS_CMD_CONFIG" 2>/dev/null | sed 's/^/  • /'
+            ;;
+        log|events)
+            say "${MSG[smscmd_events_header]}"
+            tail -20 /data/sms-cmd/events.log 2>/dev/null || echo "(no events yet)"
+            ;;
+        *)
+            say "${MSG[smscmd_usage]}"
+            ;;
+    esac
+}
+
 # ─── /ussd — disabled on this modem ───────────────────────────────────────
 # The UMS9620 modem's AT+CUSD only supports modes 0/1/2 (enable/disable/
 # cancel). Sending a USSD code through AT (e.g. AT+CUSD=1,"*123#",15)
@@ -3921,6 +3992,7 @@ dispatch() {
         /imsi_watch|/imsiwatch|/imsi)  reply=$(cmd_imsi_watch "$args") ;;
         /locate|/where|/konum)         reply=$(cmd_locate) ;;
         /ussd|/shortcode)              reply=$(cmd_ussd "$args") ;;
+        /sms_cmd|/smscmd)              reply=$(cmd_sms_cmd "$args") ;;
         # ─── power / kernel ────────────────────────────────────────────
         /cpu_freq|/cpufreq|/freq)      reply=$(cmd_cpu_freq) ;;
         /cpu_governor|/governor|/gov)  reply=$(cmd_cpu_governor "$args") ;;
@@ -4007,7 +4079,7 @@ sms_list sms_count sms_send wifi \
 file screenshot ramclean at modules \
 performance zte_setpw komut reboot version iptal \
 ls cat df du log dump_sms upload \
-connections listening dhcp dns traffic_history adguard spectrum imsi_watch locate ussd \
+connections listening dhcp dns traffic_history adguard spectrum imsi_watch locate ussd sms_cmd \
 cpu_freq cpu_governor wakelock \
 freeze unfreeze installed \
 who last_boot bot_stats restart_bot \
