@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.10.1"
+BOT_VERSION="v2.10.2"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -3450,82 +3450,48 @@ fi
 
 log "Bot $BOT_VERSION starting"
 
-# Register bot commands with Telegram (once per version - cached marker)
+# Telegram /-menu commands. Descriptions come from $MSG[desc_*] so they
+# respect the current $USER_LANG (re-registered whenever lang changes).
+# Order here is the order shown in the Telegram side-menu.
+CMDS_ORDER="start help status uptime load mem disk temp ps \
+ip traffic ping clients tunnel \
+operator signal cellinfo imei imei_sorgula imei_degis qos \
+sms_list sms_count sms_send wifi \
+file screenshot ramclean at modules \
+performance zte_setpw komut reboot version iptal \
+ls cat df du log dump_sms upload \
+connections listening dhcp dns \
+cpu_freq cpu_governor wakelock \
+freeze unfreeze installed \
+who last_boot bot_stats restart_bot \
+quiet_hours heartbeat alarm schedule \
+tailscale perf_balanced perf_help minimal_mode speedtest update lang"
+
+# JSON-escape a string for setMyCommands body (handles backslash + dquote)
+json_escape() {
+    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+# Register bot commands with Telegram (once per version+lang - cached marker)
 register_commands() {
-    # Marker scoped by version AND language — switching lang triggers re-register
     local marker="$DATADIR/.cmds_registered_${BOT_VERSION}_${USER_LANG}"
     [ -f "$marker" ] && return 0
-    local body
-    body='{"commands":[
-        {"command":"start","description":"Yardım ve komut listesi"},
-        {"command":"help","description":"Tüm komutları göster"},
-        {"command":"status","description":"Cihaz durumu özeti"},
-        {"command":"uptime","description":"Çalışma süresi"},
-        {"command":"load","description":"CPU yükü"},
-        {"command":"mem","description":"RAM kullanımı"},
-        {"command":"disk","description":"Disk kullanımı"},
-        {"command":"temp","description":"CPU sıcaklığı"},
-        {"command":"ps","description":"Top 10 process (CPU)"},
-        {"command":"ip","description":"Public + local IP adresleri"},
-        {"command":"traffic","description":"Trafik (RX/TX) boot sonrası"},
-        {"command":"ping","description":"Ping testi - /ping <host>"},
-        {"command":"clients","description":"Bağlı cihazlar (ARP)"},
-        {"command":"tunnel","description":"Cloudflared tunnel durumu"},
-        {"command":"operator","description":"Cellular operatör"},
-        {"command":"signal","description":"Sinyal kalitesi"},
-        {"command":"cellinfo","description":"Operatör + IMEI + ICCID + telefon"},
-        {"command":"imei","description":"IMEI(ler) - her slot için"},
-        {"command":"imei_sorgula","description":"e-Devlet IMEI sorgu (captcha sorar)"},
-        {"command":"imei_degis","description":"IMEI değiştir - onaylı reboot"},
-        {"command":"qos","description":"QoS / Band detayları"},
-        {"command":"sms_list","description":"SIM SMS listesi"},
-        {"command":"sms_count","description":"SMS sayısı"},
-        {"command":"sms_send","description":"SMS gönder - /sms_send <num> <text>"},
-        {"command":"wifi","description":"Hotspot SSID/şifre/bağlı cihazlar"},
-        {"command":"file","description":"Dosya çek - /file <path>"},
-        {"command":"screenshot","description":"Ekran görüntüsü"},
-        {"command":"ramclean","description":"RAM temizle (VPN/sistem korunur)"},
-        {"command":"at","description":"Tekil AT komutu - /at <cmd>"},
-        {"command":"modules","description":"Magisk modülleri"},
-        {"command":"performance","description":"ZTE Performance Mode - on/off"},
-        {"command":"zte_setpw","description":"ZTE admin şifresini ayarla"},
-        {"command":"komut","description":"Shell komutu (iptal düğmeli)"},
-        {"command":"reboot","description":"Cihazı yeniden başlat (onaylı)"},
-        {"command":"version","description":"Bot ve cihaz versiyonu"},
-        {"command":"iptal","description":"Bekleyen IMEI/upload iptal"},
-        {"command":"ls","description":"Dizin listesi"},
-        {"command":"cat","description":"Dosya içeriği (4 KB)"},
-        {"command":"df","description":"Disk doluluk"},
-        {"command":"du","description":"Alt dizin boyutları"},
-        {"command":"log","description":"Bot log son N satır"},
-        {"command":"dump_sms","description":"Tüm inbox SMS dump (dosya)"},
-        {"command":"upload","description":"Cihaza dosya yükle - /upload <hedef>"},
-        {"command":"connections","description":"Aktif TCP bağlantıları"},
-        {"command":"listening","description":"Dinleyen portlar"},
-        {"command":"dhcp","description":"DHCP lease tablosu"},
-        {"command":"dns","description":"DNS yapılandırması"},
-        {"command":"cpu_freq","description":"CPU frekansları"},
-        {"command":"cpu_governor","description":"Governor göster/değiştir"},
-        {"command":"wakelock","description":"Aktif wakelocklar"},
-        {"command":"freeze","description":"Paketi dondur"},
-        {"command":"unfreeze","description":"Paketi aktive et"},
-        {"command":"installed","description":"Kurulu paketler [3rd|disabled|system|all]"},
-        {"command":"who","description":"Aktif SSH/ADB oturumları"},
-        {"command":"last_boot","description":"Boot geçmişi"},
-        {"command":"bot_stats","description":"Bot iç istatistikler"},
-        {"command":"restart_bot","description":"Botu yeniden başlat"},
-        {"command":"quiet_hours","description":"Sessiz saatler - alarmları sustur"},
-        {"command":"heartbeat","description":"Periyodik canlı sinyali"},
-        {"command":"alarm","description":"Tek seferlik alarm - /alarm HH:MM <msg>"},
-        {"command":"schedule","description":"Tekrarlayan zamanlama"},
-        {"command":"tailscale","description":"Tailscale exit-node aç/kapat (modül gerekli)"},
-        {"command":"perf_balanced","description":"8 core + freq cap (önerilen perf modu)"},
-        {"command":"perf_help","description":"CPU/Performance kılavuzu"},
-        {"command":"minimal_mode","description":"Gereksiz servisleri dondur (~640 MB)"},
-        {"command":"speedtest","description":"Cloudflare speed test - /speedtest [quick|<mb>|full]"},
-        {"command":"update","description":"Modülleri GitHub uzerinden guncelle - /update [all|<id>]"},
-        {"command":"lang","description":"Bot dilini degistir - /lang [code]"}
-    ]}'
+    # Build JSON dynamically from CMDS_ORDER + MSG[desc_*]
+    local body items first cmd desc desc_esc
+    items=""
+    first=1
+    for cmd in $CMDS_ORDER; do
+        desc="${MSG[desc_${cmd}]}"
+        [ -z "$desc" ] && continue
+        desc_esc=$(json_escape "$desc")
+        if [ "$first" = 1 ]; then
+            items="{\"command\":\"$cmd\",\"description\":\"$desc_esc\"}"
+            first=0
+        else
+            items="$items,{\"command\":\"$cmd\",\"description\":\"$desc_esc\"}"
+        fi
+    done
+    body="{\"commands\":[$items]}"
     local resp
     resp=$("$CURL" -sS --cacert "$CA" --max-time 10 \
         -H "Content-Type: application/json" \

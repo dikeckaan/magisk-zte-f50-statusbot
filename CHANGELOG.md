@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.10.2
+- **Telegram /-menu fully translated**: setMyCommands descriptions now switch
+  with /lang en|tr (re-registered each language change).
+- 67 new `[desc_*]` keys in en.sh and tr.sh.
+- `register_commands()` builds JSON dynamically from `$MSG[desc_<cmd>]` using
+  an ordered `CMDS_ORDER` list and a `json_escape` helper.
+
+# Changelog
+
 ## v2.10.1
 - **i18n migration complete**: ~95% of user-facing strings now load from `lang/<code>.sh`
 - 381 translation keys per language (EN + TR fully populated)
