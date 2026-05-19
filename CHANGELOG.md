@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.15.1 — 2026-05-19  ⚠ Hotfix
+- **CRITICAL FIX**: v2.15.0 was broken. The Phase 3 sed/perl substitution
+  that replaced ~37 `echo "$X" | awk '{print $1}'` calls with the new
+  `first_word "$X"` helper ALSO matched the helper definitions themselves,
+  producing:
+  ```
+  first_word() { first_word "$1"; }    # infinite recursion
+  rest_args()  { rest_args  "$1"; }    # infinite recursion
+  ```
+  Any command that hit dispatch (which calls `first_word "$text"` on
+  every message) entered an infinite bash recursion. Per-request CPU
+  exploded, the dispatch never returned, and Telegram never got a reply.
+- Fix: restored the original `echo | awk` bodies inside the helpers
+  (only the *call sites* should have been substituted, not the
+  *definitions*). Added bash-syntax test that calls `first_word`
+  and `rest_args` with sample input to lang_validator (Phase 5).
+
 ## v2.15.0 — 2026-05-19
 - **bot.sh refactor**: introduce `first_word`, `rest_args`, `nth_word`
   helpers at the top of the file. Migrated ~30 inline

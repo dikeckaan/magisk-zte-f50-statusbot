@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.15.0"
+BOT_VERSION="v2.15.1"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -42,8 +42,8 @@ tf() { local k=$1; shift; printf "${MSG[$k]:-$k}\n" "$@"; }
 # first_word "<text>"       → first whitespace-delimited token
 # rest_args  "<text>"       → everything after the first token
 # nth_word N "<text>"       → Nth token (1-indexed)
-first_word() { first_word "$1"; }
-rest_args()  { rest_args "$1"; }
+first_word() { echo "$1" | awk '{print $1}'; }
+rest_args()  { echo "$1" | awk '{$1=""; sub(/^ /,""); print}'; }
 nth_word()   { echo "$2" | awk -v n="$1" '{print $n}'; }
 
 # sendat binary for AT commands - prefer bin-utils, fall back to UFI-TOOLS
