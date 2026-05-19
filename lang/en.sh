@@ -469,7 +469,11 @@ On confirmation the device will REBOOT."
     [install_list_state_installed]="(installed)"
     [install_list_state_missing_required]="(required, NOT installed)"
     [install_list_available_fmt]="  ⬇  %s  (available — /install_module %s)"
-    [install_usage]="Usage:\n  /install_module <id>   — install from catalog\n  /install_module list   — show this list\n  Aliases (e.g. adguard, ssh, tunnel, ts, traffic) are resolved automatically.\n  Manifest: https://github.com/dikeckaan/f50-magisk-modules/blob/main/modules.json"
+    [install_usage]="Usage:
+  /install_module <id>   — install from catalog
+  /install_module list   — show this list
+  Aliases (e.g. adguard, ssh, tunnel, ts, traffic) are resolved automatically.
+  Manifest: https://github.com/dikeckaan/f50-magisk-modules/blob/main/modules.json"
     [install_unknown_fmt]="❌ Unknown module: %s. Try /install_module list."
     [install_no_url_fmt]="❌ %s has no update_json URL in the catalog."
     [install_already_present_fmt]="ℹ️ %s is already installed. Use /update %s to upgrade."
@@ -495,7 +499,8 @@ On confirmation the device will REBOOT."
     # ─── /adguard (adguardhome module) ───────────────────────────────
     [agh_not_installed]="🛡 AdGuard Home module is not installed. Flash it from github.com/dikeckaan/magisk-zte-f50-adguardhome and reboot."
     [agh_status_running_fmt]="🛡 AdGuard Home: 🟢 running\nPID: %s\nRAM: %d MB\nQueries today: %s\nBlocked today: %s\n"
-    [agh_status_stopped]="🛡 AdGuard Home: ⚪ stopped\nStart it with /adguard on"
+    [agh_status_stopped]="🛡 AdGuard Home: ⚪ stopped
+Start it with /adguard on"
     [agh_already_running]="🛡 Already running. Use /adguard status for details."
     [agh_started]="🛡 Started. Web UI at http://192.168.0.1:3000"
     [agh_start_failed]="❌ Could not start. Check /adguard log for details."
@@ -504,7 +509,12 @@ On confirmation the device will REBOOT."
     [agh_log_header]="📜 AdGuard Home daemon log (last 30 lines):"
     [agh_no_log]="📜 No log file yet — daemon may not have started."
     [agh_url_fmt]="🌐 AdGuard Home Web UI: %s"
-    [agh_help]="🛡 AdGuard Home\n/adguard status   — running? RAM? today's counts\n/adguard on       — start daemon\n/adguard off      — stop daemon (free RAM)\n/adguard log      — last 30 daemon log lines\n/adguard url      — web UI URL\n"
+    [agh_help]="🛡 AdGuard Home
+/adguard status   — running? RAM? today's counts
+/adguard on       — start daemon
+/adguard off      — stop daemon (free RAM)
+/adguard log      — last 30 daemon log lines
+/adguard url      — web UI URL"
 
     # ─── /cpu_freq /cpu_governor /wakelock ───────────────────────────
     [cpufreq_header]="⚡ CPU Frequencies"

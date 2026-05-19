@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.15.5"
+BOT_VERSION="v2.15.6"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -34,9 +34,14 @@ if [ -n "$USER_LANG" ] && [ "$USER_LANG" != "en" ] && [ -r "$MODDIR/lang/${USER_
 fi
 
 # Translate helper: t <key> → MSG[key] or, if missing, the key itself
-t() { echo "${MSG[$1]:-$1}"; }
+t() { printf '%b\n' "${MSG[$1]:-$1}"; }
 # Translate-format: tf <key> <args...> → printf MSG[key] with args
 tf() { local k=$1; shift; printf "${MSG[$k]:-$k}\n" "$@"; }
+# say <text> — print $1 interpreting backslash escapes (\n, \t) in the
+# argument. Used as a defensive replacement for `echo "${MSG[X]}"` so
+# that a lang string written with literal "\n" still renders as a
+# newline at the user's screen. %b is safe with % chars in $1 too.
+say() { printf '%b\n' "$1"; }
 
 # ─── argv helpers (replace ~40 inline `echo|awk` subshell calls) ──────────
 # first_word "<text>"       → first whitespace-delimited token
@@ -249,7 +254,7 @@ fmt_operator() {
 # ─── UFI sendat helpers ───────────────────────────────────────────────────
 at_cmd() {
     # $1 = AT command, $2 = slot (default 0). Outputs cleaned response.
-    [ -x "$SENDAT" ] || { echo "${MSG[no_sendat_short]}"; return 1; }
+    [ -x "$SENDAT" ] || { say "${MSG[no_sendat_short]}"; return 1; }
     local slot="${2:-0}"
     "$SENDAT" -c "$1" -n "$slot" 2>/dev/null | tr -d '\r' | sed 's/OK$//' | head -c 400
 }
@@ -264,11 +269,11 @@ csq_to_dbm() {
 
 csq_label() {
     local csq="$1"
-    if   [ "$csq" -ge 20 ]; then echo "${MSG[csq_excellent]}"
-    elif [ "$csq" -ge 15 ]; then echo "${MSG[csq_good]}"
-    elif [ "$csq" -ge 10 ]; then echo "${MSG[csq_moderate]}"
-    elif [ "$csq" -ge 2 ];  then echo "${MSG[csq_weak]}"
-    else                         echo "${MSG[csq_very_weak]}"
+    if   [ "$csq" -ge 20 ]; then say "${MSG[csq_excellent]}"
+    elif [ "$csq" -ge 15 ]; then say "${MSG[csq_good]}"
+    elif [ "$csq" -ge 10 ]; then say "${MSG[csq_moderate]}"
+    elif [ "$csq" -ge 2 ];  then say "${MSG[csq_weak]}"
+    else                         say "${MSG[csq_very_weak]}"
     fi
 }
 
@@ -294,7 +299,7 @@ fmt_signal() {
     if [ -n "$rsrp" ] && [ "$rsrp" != "255" ]; then
         # RSRP dBm = rsrp - 141 + 1 ... actually: -141 to -44 maps to 0-97. RSRP_dBm = rsrp - 141
         echo ""
-        echo "${MSG[lte_details]}"
+        say "${MSG[lte_details]}"
         echo "  RSRP: $((rsrp - 141)) dBm"
         if [ -n "$rsrq" ] && [ "$rsrq" != "255" ]; then
             # RSRQ dB = (rsrq - 40) / 2 ... actually: rsrq is 0-34 mapping -19.5 to -3.0 dB
@@ -310,7 +315,7 @@ fmt_battery() {
     local temp=$(cat /sys/class/power_supply/battery/temp 2>/dev/null)
     local volt=$(cat /sys/class/power_supply/battery/voltage_now 2>/dev/null)
 
-    [ -z "$cap" ] && { echo "${MSG[bat_unread]}"; return; }
+    [ -z "$cap" ] && { say "${MSG[bat_unread]}"; return; }
 
     local filled=$((cap / 10))
     local pbar=""
@@ -329,7 +334,7 @@ fmt_battery() {
         *)             status_label="$status" ;;
     esac
 
-    echo "${MSG[bat_header]}"
+    say "${MSG[bat_header]}"
     printf "${MSG[bat_charge_fmt]}\n" "$cap" "$pbar"
     printf "${MSG[bat_state_fmt]}\n" "$status_label"
     [ -n "$temp" ] && printf "${MSG[bat_temp_fmt]}\n" "$(awk -v t="$temp" 'BEGIN{printf "%.1f°C", t/10}')"
@@ -395,10 +400,10 @@ cmd_at() {
     # Generic AT runner. Args: optional "slot=N", then full AT command.
     local args="$*"
     if [ -z "$args" ]; then
-        echo "${MSG[at_usage]}"
+        say "${MSG[at_usage]}"
         return
     fi
-    [ ! -x "$SENDAT" ] && { echo "${MSG[at_no_sendat]}"; return; }
+    [ ! -x "$SENDAT" ] && { say "${MSG[at_no_sendat]}"; return; }
 
     local slot=0
     case "$args" in
@@ -410,13 +415,13 @@ cmd_at() {
 
     case "$args" in
         AT*|at*) ;;
-        *) echo "${MSG[at_must_start_with]}"; return ;;
+        *) say "${MSG[at_must_start_with]}"; return ;;
     esac
 
     local resp=$(at_cmd "$args" "$slot")
     tf at_request_fmt "$args" "$slot"
     echo
-    [ -z "$resp" ] && echo "${MSG[at_empty_response]}" || echo "$resp"
+    [ -z "$resp" ] && say "${MSG[at_empty_response]}" || echo "$resp"
 }
 
 edevlet_session_get_token_captcha() {
@@ -612,7 +617,7 @@ cmd_ramclean() {
 
     case "$arg1" in
         list|top)
-            echo "${MSG[rc_list_header]}"
+            say "${MSG[rc_list_header]}"
             ps -A -o rss,name --sort=-rss 2>/dev/null | head -16 | awk 'NR==1 {next} {printf "  %s MB  %s\n", int($1/1024), $2}'
             return
             ;;
@@ -741,7 +746,7 @@ cmd_ramclean() {
     elif [ "$freed_ram" -lt -1024 ]; then
         printf "${MSG[rc_ram_loss_fmt]}\n" "$((freed_ram/1024))"
     else
-        echo "${MSG[rc_ram_same]}"
+        say "${MSG[rc_ram_same]}"
     fi
     [ "$freed_swap" -gt 0 ] && printf "${MSG[rc_swap_gain_fmt]}\n" "$((freed_swap/1024))"
 
@@ -751,7 +756,7 @@ cmd_ramclean() {
         [ "$killed_count" -gt 8 ] && printf "${MSG[rc_killed_more_fmt]}\n" "$((killed_count - 8))"
     fi
     echo ""
-    echo "${MSG[rc_modes_help]}"
+    say "${MSG[rc_modes_help]}"
 }
 
 # ─── filesystem / inspection ──────────────────────────────────────────────
@@ -764,7 +769,7 @@ cmd_ls() {
 
 cmd_cat() {
     local p="$1"
-    [ -z "$p" ] && { echo "${MSG[cat_usage]}"; return; }
+    [ -z "$p" ] && { say "${MSG[cat_usage]}"; return; }
     [ ! -f "$p" ] && { tf cat_no_file_fmt "$p"; return; }
     local size
     size=$(stat -c %s "$p" 2>/dev/null || echo 0)
@@ -777,7 +782,7 @@ cmd_cat() {
 }
 
 cmd_df() {
-    echo "${MSG[df_header]}"
+    say "${MSG[df_header]}"
     df -h 2>/dev/null | awk 'NR==1 || /\/data|\/system|\/cache|\/dev$|\/tmp/ {print}'
 }
 
@@ -790,27 +795,27 @@ cmd_du() {
 
 # ─── network inspection ───────────────────────────────────────────────────
 cmd_connections() {
-    echo "${MSG[conn_header]}"
+    say "${MSG[conn_header]}"
     netstat -tn 2>/dev/null | awk '$NF=="ESTABLISHED" {print $4 "  ↔  " $5}' | sort -u | head -30
 }
 
 cmd_listening() {
-    echo "${MSG[listen_header]}"
+    say "${MSG[listen_header]}"
     netstat -tlnp 2>/dev/null | awk '/LISTEN/ {printf "  %-22s  %s\n", $4, $7}' | sort -u | head -30
 }
 
 cmd_dns() {
-    echo "${MSG[dns_header]}"
+    say "${MSG[dns_header]}"
     for f in /etc/resolv.conf /system/etc/resolv.conf; do
         [ -r "$f" ] && echo "$f:" && cat "$f" 2>/dev/null
     done
     echo
-    echo "${MSG[dns_active]}"
+    say "${MSG[dns_active]}"
     getprop | grep -iE "^\[net.dns" | head -5
 }
 
 cmd_dhcp() {
-    echo "${MSG[dhcp_header]}"
+    say "${MSG[dhcp_header]}"
     echo
     # Identify DHCP server (Android tethering uses dnsmasq with no lease file — stateless)
     local dnsmasq_pid
@@ -818,14 +823,14 @@ cmd_dhcp() {
     if [ -n "$dnsmasq_pid" ]; then
         tf dhcp_server_fmt "$dnsmasq_pid"
     else
-        echo "${MSG[dhcp_no_server]}"
+        say "${MSG[dhcp_no_server]}"
     fi
     # Bridge gateway IP
     local gw
     gw=$(ip -4 addr show br0 2>/dev/null | awk '/inet /{print $2; exit}')
     [ -n "$gw" ] && tf dhcp_bridge_fmt "$gw"
     echo
-    echo "${MSG[dhcp_clients_header]}"
+    say "${MSG[dhcp_clients_header]}"
     local cnt=0
     local line
     ip neigh show dev br0 2>/dev/null | awk '$1!~/^fe80/ && NF>=4 {
@@ -834,7 +839,7 @@ cmd_dhcp() {
         if (mac != "") printf "  %-15s  %-17s  %s\n", ip, mac, state
     }' | head -20
     cnt=$(ip neigh show dev br0 2>/dev/null | awk '$1!~/^fe80/ && /lladdr/' | wc -l)
-    [ "$cnt" -eq 0 ] && echo "${MSG[dhcp_none]}"
+    [ "$cnt" -eq 0 ] && say "${MSG[dhcp_none]}"
     echo
     tf dhcp_total_fmt "$cnt"
 }
@@ -975,12 +980,12 @@ cmd_install_module() {
     local arg=$(first_word "$1" | tr '[:upper:]' '[:lower:]')
     local manifest
     if ! manifest=$(fetch_modules_manifest); then
-        echo "${MSG[install_manifest_failed]}"
+        say "${MSG[install_manifest_failed]}"
         return
     fi
 
     if [ -z "$arg" ] || [ "$arg" = "list" ]; then
-        echo "${MSG[install_list_header]}"
+        say "${MSG[install_list_header]}"
         echo
         local id name desc required
         # Walk every entry in the manifest. tab-separated for safe parsing.
@@ -996,7 +1001,7 @@ cmd_install_module() {
             fi
         done
         echo
-        echo "${MSG[install_usage]}"
+        say "${MSG[install_usage]}"
         return
     fi
 
@@ -1017,7 +1022,7 @@ cmd_install_module() {
 
     if install_module_from_url "$mod_id" "$url"; then
         echo
-        echo "${MSG[install_reboot_hint]}"
+        say "${MSG[install_reboot_hint]}"
         echo "<<REBOOT_BUTTON>>"
     fi
 }
@@ -1041,14 +1046,14 @@ cmd_traffic_history() {
     fi
     local db=/data/traffic-stats
     if [ ! -d "$db" ]; then
-        echo "${MSG[traffic_hist_not_installed]}"
+        say "${MSG[traffic_hist_not_installed]}"
         return
     fi
     local today=$(date +%Y-%m-%d)
     local month_prefix=$(date +%Y-%m)
     local week_ago=$(date -d "7 days ago" +%Y-%m-%d 2>/dev/null || date -v-7d +%Y-%m-%d 2>/dev/null)
 
-    echo "${MSG[traffic_hist_header]}"
+    say "${MSG[traffic_hist_header]}"
     echo
     local iface idir rx_today tx_today rx_week tx_week rx_month tx_month
     local f rx tx printed=0
@@ -1094,7 +1099,7 @@ cmd_traffic_history() {
             "$(fmt_bytes "$rx_month")" "$(fmt_bytes "$tx_month")"
         printed=$((printed+1))
     done
-    [ "$printed" -eq 0 ] && echo "${MSG[traffic_hist_empty]}"
+    [ "$printed" -eq 0 ] && say "${MSG[traffic_hist_empty]}"
 }
 
 # ─── AdGuard Home integration (module adguardhome) ────────────────────────
@@ -1112,7 +1117,7 @@ cmd_adguard() {
     fi
     local moddir
     if ! moddir=$(adguard_module_dir); then
-        echo "${MSG[agh_not_installed]}"
+        say "${MSG[agh_not_installed]}"
         return
     fi
     local bin="$moddir/system/bin/AdGuardHome"
@@ -1145,19 +1150,19 @@ cmd_adguard() {
                 fi
                 printf "${MSG[agh_status_running_fmt]}" "$pid" "$mem_mb" "$queries_today" "$blocked_today"
             else
-                echo "${MSG[agh_status_stopped]}"
+                say "${MSG[agh_status_stopped]}"
             fi
             ;;
         on|start)
             if [ -n "$pid_line" ]; then
-                echo "${MSG[agh_already_running]}"
+                say "${MSG[agh_already_running]}"
             else
                 nohup sh "$svc" >/dev/null 2>&1 &
                 sleep 2
                 if pgrep -f "$bin" >/dev/null 2>&1; then
-                    echo "${MSG[agh_started]}"
+                    say "${MSG[agh_started]}"
                 else
-                    echo "${MSG[agh_start_failed]}"
+                    say "${MSG[agh_start_failed]}"
                 fi
             fi
             ;;
@@ -1170,7 +1175,7 @@ cmd_adguard() {
                         -j REDIRECT --to-ports 5353 2>/dev/null; do :; done
                 while iptables -t nat -D PREROUTING -i br0 -p tcp --dport 53 \
                         -j REDIRECT --to-ports 5353 2>/dev/null; do :; done
-                echo "${MSG[agh_already_stopped]}"
+                say "${MSG[agh_already_stopped]}"
             else
                 # Match by basename — same reason as pgrep above.
                 pkill -f AdGuardHome 2>/dev/null
@@ -1185,15 +1190,15 @@ cmd_adguard() {
                 while iptables -t nat -D PREROUTING -i br0 -p tcp --dport 53 \
                         -j REDIRECT --to-ports 5353 2>/dev/null; do :; done
                 sleep 1
-                echo "${MSG[agh_stopped]}"
+                say "${MSG[agh_stopped]}"
             fi
             ;;
         log|logs)
             if [ -r "$data/daemon.log" ]; then
-                echo "${MSG[agh_log_header]}"
+                say "${MSG[agh_log_header]}"
                 tail -n 30 "$data/daemon.log"
             else
-                echo "${MSG[agh_no_log]}"
+                say "${MSG[agh_no_log]}"
             fi
             ;;
         url|web)
@@ -1203,14 +1208,14 @@ cmd_adguard() {
             printf "${MSG[agh_url_fmt]}" "http://$gw:3000"
             ;;
         *)
-            echo "${MSG[agh_help]}"
+            say "${MSG[agh_help]}"
             ;;
     esac
 }
 
 # ─── power / kernel ───────────────────────────────────────────────────────
 cmd_cpu_freq() {
-    echo "${MSG[cpufreq_header]}"
+    say "${MSG[cpufreq_header]}"
     local i=0
     for d in /sys/devices/system/cpu/cpu[0-9]*/cpufreq; do
         [ -d "$d" ] || continue
@@ -1228,7 +1233,7 @@ cmd_cpu_freq() {
 cmd_cpu_governor() {
     local arg="$1"
     if [ -z "$arg" ] || [ "$arg" = "status" ]; then
-        echo "${MSG[gov_status_header]}"
+        say "${MSG[gov_status_header]}"
         local i
         for i in 0 1 2 3 4 5 6 7; do
             local d=/sys/devices/system/cpu/cpu$i
@@ -1252,7 +1257,7 @@ cmd_cpu_governor() {
         done
         echo
         tf gov_available_fmt "$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors 2>/dev/null)"
-        echo "${MSG[gov_change_hint]}"
+        say "${MSG[gov_change_hint]}"
         return
     fi
     # Apply at policy level. For offline policies, briefly online one CPU to
@@ -1298,10 +1303,10 @@ $(printf "${MSG[gov_skipped_fmt]}" "$skipped")"
 }
 
 cmd_wakelock() {
-    echo "${MSG[wakelock_header]}"
+    say "${MSG[wakelock_header]}"
     local src=/sys/kernel/debug/wakeup_sources
     [ ! -r "$src" ] && src=/sys/kernel/wakeup_sources
-    [ ! -r "$src" ] && { echo "${MSG[wakelock_unread]}"; return; }
+    [ ! -r "$src" ] && { say "${MSG[wakelock_unread]}"; return; }
     # Show entries with active_count or non-zero active_since
     awk 'NR==1 {next} $0~/^name/ {next}
     {
@@ -1316,7 +1321,7 @@ cmd_wakelock() {
 # ─── app management ───────────────────────────────────────────────────────
 cmd_freeze() {
     local pkg="$1"
-    [ -z "$pkg" ] && { echo "${MSG[freeze_usage]}"; return; }
+    [ -z "$pkg" ] && { say "${MSG[freeze_usage]}"; return; }
     local out
     out=$(pm disable-user --user 0 "$pkg" 2>&1)
     case "$out" in
@@ -1327,7 +1332,7 @@ cmd_freeze() {
 
 cmd_unfreeze() {
     local pkg="$1"
-    [ -z "$pkg" ] && { echo "${MSG[unfreeze_usage]}"; return; }
+    [ -z "$pkg" ] && { say "${MSG[unfreeze_usage]}"; return; }
     local out
     out=$(pm enable "$pkg" 2>&1)
     case "$out" in
@@ -1340,24 +1345,24 @@ cmd_installed() {
     local arg="$1"
     case "$arg" in
         ""|3rd|user)
-            echo "${MSG[installed_user_header]}"
+            say "${MSG[installed_user_header]}"
             pm list packages -3 2>/dev/null | sed 's/^package://' | head -30 ;;
         disabled|frozen)
-            echo "${MSG[installed_disabled_header]}"
+            say "${MSG[installed_disabled_header]}"
             pm list packages -d 2>/dev/null | sed 's/^package://' ;;
         system)
-            echo "${MSG[installed_system_header]}"
+            say "${MSG[installed_system_header]}"
             pm list packages -s 2>/dev/null | sed 's/^package://' | head -50 ;;
         all)
             tf installed_all_header_fmt "$(pm list packages 2>/dev/null | wc -l)"
             pm list packages 2>/dev/null | sed 's/^package://' | head -50 ;;
-        *) echo "${MSG[installed_usage]}" ;;
+        *) say "${MSG[installed_usage]}" ;;
     esac
 }
 
 # ─── security / audit ─────────────────────────────────────────────────────
 cmd_who() {
-    echo "${MSG[who_header]}"
+    say "${MSG[who_header]}"
     echo
     echo "SSH:"
     netstat -tn 2>/dev/null | awk '$4~/:22222$/ && $NF=="ESTABLISHED" {print "  " $5}'
@@ -1367,10 +1372,10 @@ cmd_who() {
 }
 
 cmd_last_boot() {
-    echo "${MSG[last_boot_header]}"
+    say "${MSG[last_boot_header]}"
     tf last_boot_current_fmt "$(awk '{printf "%dh %02dm", $1/3600, ($1%3600)/60}' /proc/uptime)"
     echo
-    echo "${MSG[last_boot_prev]}"
+    say "${MSG[last_boot_prev]}"
     logcat -d -b system 2>/dev/null | grep -iE "boot_completed|sys.boot_completed" | tail -3
 }
 
@@ -1390,7 +1395,7 @@ cmd_dump_sms() {
         --sort 'date DESC' 2>/dev/null > "$out"
     local cnt=$(wc -l < "$out")
     if [ "$cnt" -eq 0 ]; then
-        echo "${MSG[dump_sms_none]}"
+        say "${MSG[dump_sms_none]}"
         rm -f "$out"
         return
     fi
@@ -1414,7 +1419,7 @@ cmd_bot_stats() {
 }
 
 cmd_restart_bot() {
-    echo "${MSG[bot_restart_msg]}"
+    say "${MSG[bot_restart_msg]}"
     log "Bot restart requested via command"
     ( sleep 2; kill $(cat "$DATADIR/bot.pid" 2>/dev/null) ) &
 }
@@ -1454,22 +1459,22 @@ cmd_quiet_hours() {
             is_quiet_hours && state="${MSG[qh_active]}"
             tf qh_status_fmt "$from" "$to" "$state"
         else
-            echo "${MSG[qh_not_set]}"
+            say "${MSG[qh_not_set]}"
         fi
         return
     fi
     if [ "$args" = "off" ] || [ "$args" = "kapat" ]; then
         rm -f "$QUIET_FILE"
-        echo "${MSG[qh_off]}"
+        say "${MSG[qh_off]}"
         return
     fi
     local from to
     from=$(first_word "$args")
     to=$(nth_word 2 "$args")
-    case "$from" in ''|*[!0-9]*) echo "${MSG[qh_invalid_from]}"; return ;; esac
-    case "$to" in ''|*[!0-9]*) echo "${MSG[qh_invalid_to]}"; return ;; esac
-    [ "$from" -lt 0 ] || [ "$from" -gt 23 ] && { echo "${MSG[qh_range_from]}"; return; }
-    [ "$to" -lt 0 ] || [ "$to" -gt 23 ] && { echo "${MSG[qh_range_to]}"; return; }
+    case "$from" in ''|*[!0-9]*) say "${MSG[qh_invalid_from]}"; return ;; esac
+    case "$to" in ''|*[!0-9]*) say "${MSG[qh_invalid_to]}"; return ;; esac
+    [ "$from" -lt 0 ] || [ "$from" -gt 23 ] && { say "${MSG[qh_range_from]}"; return; }
+    [ "$to" -lt 0 ] || [ "$to" -gt 23 ] && { say "${MSG[qh_range_to]}"; return; }
     { echo "from=$from"; echo "to=$to"; } > "$QUIET_FILE"
     tf qh_set_fmt "$from" "$to"
 }
@@ -1482,17 +1487,17 @@ cmd_heartbeat() {
             intv=$(awk -F= '/^interval=/{print $2}' "$HEARTBEAT_CONF")
             tf hb_status_fmt "$((intv/3600))"
         else
-            echo "${MSG[hb_not_set]}"
+            say "${MSG[hb_not_set]}"
         fi
         return
     fi
     if [ "$args" = "off" ] || [ "$args" = "kapat" ]; then
         rm -f "$HEARTBEAT_CONF" "$LAST_HEARTBEAT"
-        echo "${MSG[hb_disabled]}"
+        say "${MSG[hb_disabled]}"
         return
     fi
-    case "$args" in *[!0-9]*) echo "${MSG[hb_not_number]}"; return ;; esac
-    [ "$args" -lt 1 ] && { echo "${MSG[hb_min_one]}"; return; }
+    case "$args" in *[!0-9]*) say "${MSG[hb_not_number]}"; return ;; esac
+    [ "$args" -lt 1 ] && { say "${MSG[hb_min_one]}"; return; }
     local secs=$((args * 3600))
     echo "interval=$secs" > "$HEARTBEAT_CONF"
     date +%s > "$LAST_HEARTBEAT"
@@ -1521,19 +1526,19 @@ SCHEDULES_FILE="$DATADIR/schedules.txt"
 cmd_alarm() {
     # /alarm HH:MM <message>   one-shot at next occurrence of HH:MM
     local args="$1"
-    [ -z "$args" ] && { echo "${MSG[alarm_usage]}"; return; }
+    [ -z "$args" ] && { say "${MSG[alarm_usage]}"; return; }
     local time_part
     time_part=$(first_word "$args")
     local msg
     msg=$(rest_args "$args")
-    [ -z "$msg" ] && { echo "${MSG[alarm_no_msg]}"; return; }
+    [ -z "$msg" ] && { say "${MSG[alarm_no_msg]}"; return; }
     local h m
     h=$(echo "$time_part" | cut -d: -f1)
     m=$(echo "$time_part" | cut -d: -f2)
-    case "$h" in ''|*[!0-9]*) echo "${MSG[alarm_bad_hour]}"; return ;; esac
-    case "$m" in ''|*[!0-9]*) echo "${MSG[alarm_bad_min]}"; return ;; esac
+    case "$h" in ''|*[!0-9]*) say "${MSG[alarm_bad_hour]}"; return ;; esac
+    case "$m" in ''|*[!0-9]*) say "${MSG[alarm_bad_min]}"; return ;; esac
     h=$((10#$h)); m=$((10#$m))
-    [ "$h" -gt 23 ] || [ "$m" -gt 59 ] && { echo "${MSG[alarm_bad_time]}"; return; }
+    [ "$h" -gt 23 ] || [ "$m" -gt 59 ] && { say "${MSG[alarm_bad_time]}"; return; }
 
     local now=$(date +%s)
     local cur_h cur_m cur_s
@@ -1562,10 +1567,10 @@ cmd_schedule() {
     case "$arg1" in
         ""|status|list)
             if [ ! -s "$SCHEDULES_FILE" ]; then
-                echo "${MSG[sch_empty]}"
+                say "${MSG[sch_empty]}"
                 return
             fi
-            echo "${MSG[sch_header]}"
+            say "${MSG[sch_header]}"
             local i=0 now=$(date +%s)
             while IFS='|' read -r when type rest; do
                 i=$((i+1))
@@ -1580,11 +1585,11 @@ cmd_schedule() {
             done < "$SCHEDULES_FILE"
             return ;;
         clear)
-            rm -f "$SCHEDULES_FILE"; echo "${MSG[sch_cleared]}"; return ;;
+            rm -f "$SCHEDULES_FILE"; say "${MSG[sch_cleared]}"; return ;;
         cancel)
             local idx
             idx=$(echo "$1" | awk '{print $2}')
-            [ -z "$idx" ] && { echo "${MSG[sch_cancel_usage]}"; return; }
+            [ -z "$idx" ] && { say "${MSG[sch_cancel_usage]}"; return; }
             local tmp="${SCHEDULES_FILE}.tmp"
             awk -v drop="$idx" 'NR != drop' "$SCHEDULES_FILE" > "$tmp" && mv "$tmp" "$SCHEDULES_FILE"
             tf sch_cancelled_fmt "$idx"; return ;;
@@ -1594,9 +1599,9 @@ cmd_schedule() {
     local secs cmd
     secs=$(first_word "$1")
     cmd=$(rest_args "$1")
-    case "$secs" in *[!0-9]*) echo "${MSG[sch_invalid_usage]}"; return ;; esac
-    [ -z "$cmd" ] && { echo "${MSG[sch_no_cmd]}"; return; }
-    [ "$secs" -lt 10 ] && { echo "${MSG[sch_min_secs]}"; return; }
+    case "$secs" in *[!0-9]*) say "${MSG[sch_invalid_usage]}"; return ;; esac
+    [ -z "$cmd" ] && { say "${MSG[sch_no_cmd]}"; return; }
+    [ "$secs" -lt 10 ] && { say "${MSG[sch_min_secs]}"; return; }
 
     local now=$(date +%s)
     local next=$((now + secs))
@@ -1791,7 +1796,7 @@ cmd_tailscale() {
     TS_BIN=$(ts_find_bin tailscale)
     TSD_BIN=$(ts_find_bin tailscaled)
     if [ -z "$TS_BIN" ] || [ -z "$TSD_BIN" ]; then
-        echo "${MSG[ts_binary_missing]}"
+        say "${MSG[ts_binary_missing]}"
         return
     fi
 
@@ -1813,7 +1818,7 @@ cmd_tailscale() {
             ;;
         on)
             if ts_is_running; then
-                echo "${MSG[ts_already_running]}"
+                say "${MSG[ts_already_running]}"
                 return
             fi
             mkdir -p "$TS_DIR" "$TS_DIR/cache"
@@ -1878,7 +1883,7 @@ cmd_tailscale() {
         off)
             if ! ts_is_running; then
                 ts_del_iptables  # cleanup any orphan rules
-                echo "${MSG[ts_already_off]}"
+                say "${MSG[ts_already_off]}"
                 return
             fi
             ts_cli down 2>/dev/null
@@ -1890,13 +1895,13 @@ cmd_tailscale() {
             rm -f "$TS_PID"
             ts_del_iptables
             log "tailscale off"
-            echo "${MSG[ts_stopped]}"
+            say "${MSG[ts_stopped]}"
             ;;
         auth)
             local key
             key=$(nth_word 2 "$args")
             if [ -z "$key" ]; then
-                echo "${MSG[ts_auth_usage]}"
+                say "${MSG[ts_auth_usage]}"
                 return
             fi
             mkdir -p "$TS_DIR"
@@ -1916,23 +1921,23 @@ cmd_tailscale() {
             ts_del_iptables
             rm -f "$TS_STATE" "$TS_PID" "$TS_AUTHKEY"
             log "tailscale logout + state wiped"
-            echo "${MSG[ts_logout_done]}"
+            say "${MSG[ts_logout_done]}"
             ;;
         ip)
-            ts_is_running || { echo "${MSG[ts_off_short]}"; return; }
+            ts_is_running || { say "${MSG[ts_off_short]}"; return; }
             ts_cli ip 2>/dev/null
             ;;
         peers)
-            ts_is_running || { echo "${MSG[ts_off_short]}"; return; }
+            ts_is_running || { say "${MSG[ts_off_short]}"; return; }
             ts_cli status 2>/dev/null | head -30
             ;;
         log)
-            [ ! -f "$TS_LOG" ] && { echo "${MSG[ts_log_none]}"; return; }
-            echo "${MSG[ts_log_header]}"
+            [ ! -f "$TS_LOG" ] && { say "${MSG[ts_log_none]}"; return; }
+            say "${MSG[ts_log_header]}"
             tail -20 "$TS_LOG"
             ;;
         *)
-            echo "${MSG[ts_usage]}" ;;
+            say "${MSG[ts_usage]}" ;;
     esac
 }
 
@@ -1985,7 +1990,7 @@ cmd_update() {
 
     case "$arg" in
         ""|check|status)
-            echo "${MSG[update_header]}"
+            say "${MSG[update_header]}"
             echo
             local found=0 outdated=0
             local mod_dir cur_ver cur_vcode cur_id update_url remote_resp remote_ver remote_vcode
@@ -2017,14 +2022,14 @@ cmd_update() {
             done
             echo
             if [ "$found" -eq 0 ]; then
-                echo "${MSG[update_none_defined]}"
+                say "${MSG[update_none_defined]}"
             elif [ "$outdated" -eq 0 ]; then
-                echo "${MSG[update_all_current]}"
+                say "${MSG[update_all_current]}"
             else
                 tf update_count_outdated_fmt "$outdated"
             fi ;;
         all)
-            echo "${MSG[update_all_start]}"
+            say "${MSG[update_all_start]}"
             local total=0 updated=0 failed=0
             local mod_dir update_url cur_id cur_vcode remote_resp remote_ver remote_vcode zipurl remote_sha
             for mod_dir in /data/adb/modules/*/; do
@@ -2075,7 +2080,7 @@ cmd_update() {
             echo
             tf update_summary_fmt "$total" "$updated" "$failed"
             if [ "$updated" -gt 0 ]; then
-                echo "${MSG[update_reboot_hint]}"
+                say "${MSG[update_reboot_hint]}"
                 if grep -q "statusbot.*✅" /data/statusbot/bot.log.tmp 2>/dev/null; then
                     ( sleep 3; kill $(cat "$DATADIR/bot.pid" 2>/dev/null) ) &
                 fi
@@ -2112,7 +2117,7 @@ cmd_update() {
             tf update_downloading_fmt "$cur_id" "$remote_ver"
             local tmp_zip=/data/local/tmp/.update_$cur_id.zip
             "$CURL" -sSL --cacert "$CA" --max-time 300 -o "$tmp_zip" "$zipurl" || {
-                echo "${MSG[update_download_failed]}"; return; }
+                say "${MSG[update_download_failed]}"; return; }
             if ! verify_zip_sha256 "$tmp_zip" "$remote_sha" "$cur_id"; then
                 rm -f "$tmp_zip"
                 return
@@ -2160,7 +2165,7 @@ ${MSG[iptal_upload]}"
 ${MSG[iptal_speedtest]}"
     fi
     if [ -z "$cancelled" ]; then
-        echo "${MSG[iptal_none]}"
+        say "${MSG[iptal_none]}"
     else
         tf iptal_done_fmt "$cancelled"
     fi
@@ -2219,7 +2224,7 @@ cmd_screenshot() {
 }
 
 cmd_wifi() {
-    echo "${MSG[wifi_header]}"
+    say "${MSG[wifi_header]}"
     echo
     # Find hostapd config — ZTE F50 uses /data/vendor/wifi/hostapd/hostapd_wlan0.conf
     local conf
@@ -2292,7 +2297,7 @@ cmd_wifi() {
         [ -n "$actual_freq" ] && printf "${MSG[wifi_freq_fmt]}\n" "$actual_freq" "$band" "$std_label"
         echo
     else
-        echo "${MSG[wifi_no_conf]}"
+        say "${MSG[wifi_no_conf]}"
         echo
     fi
 
@@ -2303,7 +2308,7 @@ cmd_wifi() {
     echo
 
     # Connected clients from ARP (filter br0 + valid MACs)
-    echo "${MSG[wifi_clients_header]}"
+    say "${MSG[wifi_clients_header]}"
     local count=0
     if [ -r /proc/net/arp ]; then
         while IFS= read -r line; do
@@ -2318,7 +2323,7 @@ cmd_wifi() {
             count=$((count+1))
         done < /proc/net/arp
     fi
-    [ "$count" -eq 0 ] && echo "${MSG[wifi_no_clients]}"
+    [ "$count" -eq 0 ] && say "${MSG[wifi_no_clients]}"
 }
 
 cmd_sms_send() {
@@ -2452,36 +2457,36 @@ cmd_performance() {
             resp=$(zte_get "performance_mode")
             mode=$(echo "$resp" | "$JQ" -r '.performance_mode // empty')
             case "$mode" in
-                1) echo "${MSG[perf_status_on]}" ;;
-                0) echo "${MSG[perf_status_off]}" ;;
+                1) say "${MSG[perf_status_on]}" ;;
+                0) say "${MSG[perf_status_off]}" ;;
                 *) tf perf_status_unread_fmt "$resp" ;;
             esac
             ;;
         on|aç|1)
-            [ ! -s "$ZTE_PWD_FILE" ] && { echo "${MSG[perf_no_password]}"; return; }
+            [ ! -s "$ZTE_PWD_FILE" ] && { say "${MSG[perf_no_password]}"; return; }
             local result
             result=$(zte_set_perf 1)
             if [ "$result" = "success" ]; then
                 echo "REBOOT_PROMPT|${MSG[perf_enabled_reboot]}"
             elif [ "$result" = "login_failed" ]; then
-                echo "${MSG[perf_login_failed]}"
+                say "${MSG[perf_login_failed]}"
             else
                 tf perf_set_failed_fmt "$result"
             fi
             ;;
         off|kapat|0)
-            [ ! -s "$ZTE_PWD_FILE" ] && { echo "${MSG[perf_no_password]}"; return; }
+            [ ! -s "$ZTE_PWD_FILE" ] && { say "${MSG[perf_no_password]}"; return; }
             local result
             result=$(zte_set_perf 0)
             if [ "$result" = "success" ]; then
                 echo "REBOOT_PROMPT|${MSG[perf_disabled_reboot]}"
             elif [ "$result" = "login_failed" ]; then
-                echo "${MSG[perf_login_failed_short]}"
+                say "${MSG[perf_login_failed_short]}"
             else
                 tf perf_set_failed_fmt "$result"
             fi
             ;;
-        *) echo "${MSG[perf_usage]}" ;;
+        *) say "${MSG[perf_usage]}" ;;
     esac
 }
 
@@ -2495,7 +2500,7 @@ cmd_perf_balanced() {
     local mhz=1800
     case "$arg" in
         ""|status)
-            echo "${MSG[pb_header]}"
+            say "${MSG[pb_header]}"
             for p in /sys/devices/system/cpu/cpufreq/policy4 /sys/devices/system/cpu/cpufreq/policy7; do
                 [ -d "$p" ] || continue
                 local cur_max hw_max
@@ -2508,12 +2513,12 @@ cmd_perf_balanced() {
             local pmode
             pmode=$(zte_get "performance_mode" 2>/dev/null | "$JQ" -r '.performance_mode // empty' 2>/dev/null)
             case "$pmode" in
-                1) echo "${MSG[pb_hint_on]}" ;;
-                0) echo "${MSG[pb_hint_off]}" ;;
-                *) echo "${MSG[pb_hint_unread]}" ;;
+                1) say "${MSG[pb_hint_on]}" ;;
+                0) say "${MSG[pb_hint_off]}" ;;
+                *) say "${MSG[pb_hint_unread]}" ;;
             esac
             echo
-            echo "${MSG[pb_usage]}"
+            say "${MSG[pb_usage]}"
             return ;;
         reset)
             local ok=0
@@ -2541,8 +2546,8 @@ cmd_perf_balanced() {
             mhz="$arg" ;;
     esac
 
-    [ "$mhz" -lt 500 ] && { echo "${MSG[pb_too_low]}"; return; }
-    [ "$mhz" -gt 3000 ] && { echo "${MSG[pb_too_high]}"; return; }
+    [ "$mhz" -lt 500 ] && { say "${MSG[pb_too_low]}"; return; }
+    [ "$mhz" -gt 3000 ] && { say "${MSG[pb_too_high]}"; return; }
     local khz=$((mhz * 1000))
 
     # Apply cap to mid + big clusters (little untouched)
@@ -2568,7 +2573,7 @@ cmd_perf_balanced() {
     done
 
     if [ "$applied" -eq 0 ]; then
-        echo "${MSG[pb_no_clusters]}"
+        say "${MSG[pb_no_clusters]}"
         return
     fi
 
@@ -2629,7 +2634,7 @@ cmd_minimal_mode() {
             running_total=$(ps -A -o name 2>/dev/null | grep -cE '^com\.|^android\.' || echo 0)
             tf mm_status_fmt "$mem_avail" "$disabled_count" "$running_total" ;;
         list|keep)
-            echo "${MSG[mm_allowlist]}" ;;
+            say "${MSG[mm_allowlist]}" ;;
         preview)
             local would_kill=0 keep=0
             local pkg
@@ -2697,10 +2702,10 @@ cmd_minimal_mode() {
             tf mm_off_done_fmt "$enabled" ;;
         disabled|tracked|disabled_list)
             if [ ! -s "$MIN_DISABLED_FILE" ]; then
-                echo "${MSG[mm_disabled_none]}"
+                say "${MSG[mm_disabled_none]}"
                 return
             fi
-            echo "${MSG[mm_disabled_header]}"
+            say "${MSG[mm_disabled_header]}"
             local i=0 pkg state
             while IFS= read -r pkg; do
                 [ -z "$pkg" ] && continue
@@ -2713,12 +2718,12 @@ cmd_minimal_mode() {
                 printf "  %d. %s  %s\n" "$i" "$pkg" "$state"
             done < "$MIN_DISABLED_FILE"
             echo
-            echo "${MSG[mm_disabled_footer]}" ;;
+            say "${MSG[mm_disabled_footer]}" ;;
         enable)
             local target
             target=$(echo "$1" | awk '{print $2}')
             if [ -z "$target" ]; then
-                echo "${MSG[mm_enable_usage]}"
+                say "${MSG[mm_enable_usage]}"
                 return
             fi
             local pkg=""
@@ -2747,7 +2752,7 @@ cmd_minimal_mode() {
             local target
             target=$(echo "$1" | awk '{print $2}')
             if [ -z "$target" ]; then
-                echo "${MSG[mm_disable_usage]}"
+                say "${MSG[mm_disable_usage]}"
                 return
             fi
             if echo "$target" | grep -qE "$MIN_KEEP_RE"; then
@@ -2766,13 +2771,13 @@ cmd_minimal_mode() {
                     tf mm_disable_failed_fmt "$result" ;;
             esac ;;
         *)
-            echo "${MSG[mm_usage]}" ;;
+            say "${MSG[mm_usage]}" ;;
     esac
 }
 
 # Performance modes user guide
 cmd_perf_help() {
-    echo "${MSG[perf_help_full]}"
+    say "${MSG[perf_help_full]}"
 }
 
 cmd_zte_setpw() {
@@ -2781,7 +2786,7 @@ cmd_zte_setpw() {
         if [ -s "$ZTE_PWD_FILE" ]; then
             tf zte_pw_set_fmt "$(wc -c < "$ZTE_PWD_FILE")"
         else
-            echo "${MSG[zte_pw_usage]}"
+            say "${MSG[zte_pw_usage]}"
         fi
         return
     fi
@@ -2825,7 +2830,7 @@ luhn_check() {
 }
 
 cmd_imei_degis() {
-    [ ! -x "$SENDAT" ] && { echo "${MSG[imei_degis_no_sendat]}"; return; }
+    [ ! -x "$SENDAT" ] && { say "${MSG[imei_degis_no_sendat]}"; return; }
     local arg1="$1"
     local arg2="$2"
     local pending="$DATADIR/pending_imei_change"
@@ -2834,7 +2839,7 @@ cmd_imei_degis() {
     # Confirmation flow: /imei_degis YES
     if [ "$arg1" = "YES" ]; then
         if [ ! -f "$pending" ]; then
-            echo "${MSG[imei_degis_no_pending]}"
+            say "${MSG[imei_degis_no_pending]}"
             return
         fi
         local ts new_imei
@@ -2842,7 +2847,7 @@ cmd_imei_degis() {
         new_imei=$(awk -F= '/^imei=/{print $2}' "$pending")
         if [ $((now - ts)) -ge 120 ]; then
             rm -f "$pending"
-            echo "${MSG[imei_degis_expired]}"
+            say "${MSG[imei_degis_expired]}"
             return
         fi
         local old=$(at_cmd "AT+CGSN" 0 | sed 's/[^0-9]//g')
@@ -2855,12 +2860,12 @@ cmd_imei_degis() {
 
     # First step: validate
     if [ -z "$arg1" ]; then
-        echo "${MSG[imei_degis_usage]}"
+        say "${MSG[imei_degis_usage]}"
         return
     fi
 
     case "$arg1" in
-        ''|*[!0-9]*) echo "${MSG[imei_degis_digits_only]}"; return ;;
+        ''|*[!0-9]*) say "${MSG[imei_degis_digits_only]}"; return ;;
     esac
     local len=${#arg1}
     if [ "$len" -ne 15 ]; then
@@ -2868,7 +2873,7 @@ cmd_imei_degis() {
         return
     fi
     if ! luhn_check "$arg1"; then
-        echo "${MSG[imei_degis_bad_luhn]}"
+        say "${MSG[imei_degis_bad_luhn]}"
         return
     fi
 
@@ -2879,7 +2884,7 @@ cmd_imei_degis() {
 }
 
 cmd_airplane() {
-    [ ! -x "$SENDAT" ] && { echo "${MSG[airplane_no_sendat]}"; return; }
+    [ ! -x "$SENDAT" ] && { say "${MSG[airplane_no_sendat]}"; return; }
     local action="$1"
     case "$action" in
         on|açik|açık|kapat)
@@ -2892,12 +2897,12 @@ cmd_airplane() {
             local resp=$(at_cmd "AT+CFUN?")
             local mode=$(echo "$resp" | sed -n 's/.*+CFUN: *\([0-9]*\).*/\1/p')
             case "$mode" in
-                0) echo "${MSG[airplane_off_state]}" ;;
-                1) echo "${MSG[airplane_active_state]}" ;;
-                4) echo "${MSG[airplane_on_state]}" ;;
+                0) say "${MSG[airplane_off_state]}" ;;
+                1) say "${MSG[airplane_active_state]}" ;;
+                4) say "${MSG[airplane_on_state]}" ;;
                 *) tf airplane_unknown_fmt "$mode" ;;
             esac ;;
-        *) echo "${MSG[airplane_usage]}" ;;
+        *) say "${MSG[airplane_usage]}" ;;
     esac
 }
 
@@ -2927,7 +2932,7 @@ cmd_sms_list() {
         --sort 'date DESC' 2>/dev/null)
 
     if [ -z "$raw" ]; then
-        echo "${MSG[sms_unread]}"
+        say "${MSG[sms_unread]}"
         return
     fi
 
@@ -2955,12 +2960,12 @@ cmd_sms_count() {
     local raw=$(content query --uri content://sms/inbox --projection _id 2>/dev/null)
     local total=$(echo "$raw" | grep -c "Row:")
     echo "💬 Inbox: $total SMS"
-    echo "${MSG[sms_count_hint]}"
+    say "${MSG[sms_count_hint]}"
 }
 
 cmd_cellinfo() {
     if [ ! -x "$SENDAT" ]; then
-        echo "${MSG[cellinfo_no_sendat]}"
+        say "${MSG[cellinfo_no_sendat]}"
         return
     fi
     echo "📡 Cellular Info"
@@ -3004,12 +3009,12 @@ cmd_ip() {
     echo "🌐 Public IP:"
     echo "  $(fmt_public_ip)"
     echo
-    echo "${MSG[ip_local_header]}"
+    say "${MSG[ip_local_header]}"
     fmt_local_ips
 }
 
 cmd_modules() {
-    echo "${MSG[modules_header]}"
+    say "${MSG[modules_header]}"
     for d in /data/adb/modules/*/; do
         [ -d "$d" ] || continue
         name=$(basename "$d")
@@ -3036,12 +3041,12 @@ cmd_tunnel() {
         tail_line=$(tail -1 /data/cloudflared/cloudflared.log 2>/dev/null | head -c 200)
         [ -n "$tail_line" ] && echo "Last log: $tail_line"
     else
-        echo "${MSG[tunnel_off]}"
+        say "${MSG[tunnel_off]}"
     fi
 }
 
 cmd_clients() {
-    echo "${MSG[clients_header]}"
+    say "${MSG[clients_header]}"
     local count=0
     if [ -r /proc/net/arp ]; then
         while IFS= read -r line; do
@@ -3054,14 +3059,14 @@ cmd_clients() {
             count=$((count+1))
         done < /proc/net/arp
     fi
-    [ "$count" -eq 0 ] && echo "${MSG[clients_none]}"
+    [ "$count" -eq 0 ] && say "${MSG[clients_none]}"
 }
 
 cmd_ping() {
     local host="$1"
-    [ -z "$host" ] && { echo "${MSG[ping_usage]}"; return; }
+    [ -z "$host" ] && { say "${MSG[ping_usage]}"; return; }
     case "$host" in
-        *[!a-zA-Z0-9.-]*) echo "${MSG[ping_invalid_host]}"; return ;;
+        *[!a-zA-Z0-9.-]*) say "${MSG[ping_invalid_host]}"; return ;;
     esac
     echo "🏓 ping $host:"
     ping -c 3 -W 2 "$host" 2>&1 | tail -5
@@ -3163,7 +3168,7 @@ cmd_speedtest() {
         cf|cloudflare)
             arg="$arg2" ;;  # fall through to CF, arg2 = size/modifier
         help|?)
-            echo "${MSG[st_usage]}"
+            say "${MSG[st_usage]}"
             return ;;
     esac
 
@@ -3174,7 +3179,7 @@ cmd_speedtest() {
         ""|down|download) size_mb=50 ;;
         full|both|up) size_mb=50; do_upload=1 ;;
         quick) size_mb=10 ;;
-        *[!0-9]*) echo "${MSG[st_usage]}"; return ;;
+        *[!0-9]*) say "${MSG[st_usage]}"; return ;;
         *)
             size_mb="$arg"
             [ "$size_mb" -lt 5 ] && size_mb=5
@@ -3203,7 +3208,7 @@ cmd_speedtest() {
         "https://speed.cloudflare.com/__down?bytes=$bytes" 2>/dev/null)
     set -- $dl_result
     local dl_size="$1" dl_bps="$2" dl_time="$3"
-    [ -z "$dl_bps" ] && { echo "${MSG[st_cf_download_failed]}"; return; }
+    [ -z "$dl_bps" ] && { say "${MSG[st_cf_download_failed]}"; return; }
     local dl_mbps
     dl_mbps=$(awk "BEGIN {printf \"%.1f\", $dl_bps * 8 / 1000000}")
 
@@ -3255,11 +3260,11 @@ cmd_speedtest_ookla() {
         mkdir -p "$(dirname "$OOKLA_BIN")"
         local tgz=/data/statusbot/.ookla.tgz
         if ! "$CURL" -sSL --cacert "$CA" --max-time 60 -o "$tgz" "$OOKLA_URL"; then
-            echo "${MSG[st_ookla_download_failed]}"
+            say "${MSG[st_ookla_download_failed]}"
             return
         fi
         if ! tar -xzf "$tgz" -C "$(dirname "$OOKLA_BIN")" speedtest 2>/dev/null; then
-            echo "${MSG[st_ookla_extract_failed]}"
+            say "${MSG[st_ookla_extract_failed]}"
             rm -f "$tgz"
             return
         fi
@@ -3338,7 +3343,7 @@ cmd_speedtest_fast() {
     done < "$urls_file"
     rm -f "$urls_file"
     if [ "$count" = 0 ] || [ "$total_bytes" = 0 ]; then
-        echo "${MSG[st_fast_download_failed]}"
+        say "${MSG[st_fast_download_failed]}"
         return
     fi
     local mbps
@@ -3382,15 +3387,15 @@ cmd_reboot() {
             pending_ts=$(cat "$PENDING_REBOOT")
             if [ $((now - pending_ts)) -lt 60 ]; then
                 rm -f "$PENDING_REBOOT"
-                echo "${MSG[reboot_starting]}"
+                say "${MSG[reboot_starting]}"
                 ( sleep 2; /system/bin/reboot ) &
                 return
             fi
         fi
-        echo "${MSG[reboot_expired]}"
+        say "${MSG[reboot_expired]}"
     else
         echo "$now" > "$PENDING_REBOOT"
-        echo "${MSG[reboot_confirm]}"
+        say "${MSG[reboot_confirm]}"
     fi
 }
 

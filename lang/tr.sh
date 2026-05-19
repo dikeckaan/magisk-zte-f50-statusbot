@@ -457,7 +457,11 @@ Uygulanınca cihaz REBOOT olacak."
     [install_list_state_installed]="(kurulu)"
     [install_list_state_missing_required]="(gerekli, KURULU DEGIL)"
     [install_list_available_fmt]="  ⬇  %s  (kurulabilir — /install_module %s)"
-    [install_usage]="Kullanim:\n  /install_module <id>   — katalogdan kur\n  /install_module list   — bu listeyi goster\n  Kisaltmalar (adguard, ssh, tunnel, ts, traffic) otomatik cozulur.\n  Manifest: https://github.com/dikeckaan/f50-magisk-modules/blob/main/modules.json"
+    [install_usage]="Kullanim:
+  /install_module <id>   — katalogdan kur
+  /install_module list   — bu listeyi goster
+  Kisaltmalar (adguard, ssh, tunnel, ts, traffic) otomatik cozulur.
+  Manifest: https://github.com/dikeckaan/f50-magisk-modules/blob/main/modules.json"
     [install_unknown_fmt]="❌ Bilinmeyen modul: %s. /install_module list deneyin."
     [install_no_url_fmt]="❌ %s icin katalogda update_json URL yok."
     [install_already_present_fmt]="ℹ️ %s zaten kurulu. Guncelleme icin /update %s kullanin."
@@ -483,7 +487,8 @@ Uygulanınca cihaz REBOOT olacak."
     # ─── /adguard (adguardhome modulu) ───────────────────────────────
     [agh_not_installed]="🛡 AdGuard Home modulu kurulu degil. github.com/dikeckaan/magisk-zte-f50-adguardhome adresinden indirip yukleyin."
     [agh_status_running_fmt]="🛡 AdGuard Home: 🟢 calisiyor\nPID: %s\nRAM: %d MB\nBugunku sorgu: %s\nBugun engellenen: %s\n"
-    [agh_status_stopped]="🛡 AdGuard Home: ⚪ durdu\n/adguard on ile baslatin"
+    [agh_status_stopped]="🛡 AdGuard Home: ⚪ durdu
+/adguard on ile baslatin"
     [agh_already_running]="🛡 Zaten calisiyor. Detay icin /adguard status."
     [agh_started]="🛡 Baslatildi. Web arayuzu: http://192.168.0.1:3000"
     [agh_start_failed]="❌ Baslatilamadi. /adguard log ile detaya bakin."
@@ -492,7 +497,12 @@ Uygulanınca cihaz REBOOT olacak."
     [agh_log_header]="📜 AdGuard Home daemon logu (son 30 satir):"
     [agh_no_log]="📜 Log dosyasi yok — daemon hic baslamamis olabilir."
     [agh_url_fmt]="🌐 AdGuard Home Web Arayuzu: %s"
-    [agh_help]="🛡 AdGuard Home\n/adguard status   — calisiyor mu? RAM? bugunun sayilari\n/adguard on       — daemon baslat\n/adguard off      — daemon durdur (RAM bosalir)\n/adguard log      — son 30 log satiri\n/adguard url      — web arayuzu URL'i\n"
+    [agh_help]="🛡 AdGuard Home
+/adguard status   — calisiyor mu? RAM? bugunun sayilari
+/adguard on       — daemon baslat
+/adguard off      — daemon durdur (RAM bosalir)
+/adguard log      — son 30 log satiri
+/adguard url      — web arayuzu URL'i"
 
     # ─── /cpu_freq /cpu_governor /wakelock ───────────────────────────
     [cpufreq_header]="⚡ CPU Frekansları"

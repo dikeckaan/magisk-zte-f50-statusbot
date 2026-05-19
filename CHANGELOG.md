@@ -1,5 +1,25 @@
 # Changelog
 
+## v2.15.6 — 2026-05-19
+- **Fixed**: lang strings written with literal `\n` (e.g.
+  `[install_usage]="Usage:\n  /install_module <id>..."`) rendered as
+  literal `\n` characters in Telegram because bash double-quoted
+  strings don't interpret backslash escapes, and `echo` doesn't either.
+  Only `printf "format" "$arg"` interprets escapes in its FORMAT string
+  — which worked by accident for our `tf`-routed keys but not for the
+  ~150 `echo "${MSG[X]}"` call sites.
+- **Two-part fix**:
+  1. New `say()` helper: `say() { printf '%b\n' "$1"; }` — `%b`
+     interprets backslash escapes in the *argument*, so any future
+     lang string written with `\n` still renders correctly. Also `t()`
+     now uses the same path.
+  2. Every existing `echo "${MSG[X]}"` (157 call sites) was rewritten
+     to `say "${MSG[X]}"` via a perl substitution.
+- The three pre-existing offenders (`install_usage`, `agh_status_stopped`,
+  `agh_help`) were ALSO converted to use real newlines in the lang
+  source — those particular strings now look cleaner in en.sh + tr.sh.
+- Lang validator + 31-test harness still green.
+
 ## v2.15.5 — 2026-05-19  ⚠ Hotfix
 - **`/adguard off` and `/adguard status` were lying.** Bot probed for
   the daemon with `pgrep -fa "$moddir/system/bin/AdGuardHome"` (the full
