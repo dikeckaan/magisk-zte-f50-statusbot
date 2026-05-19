@@ -1,5 +1,26 @@
 # Changelog
 
+## v2.17.1 — 2026-05-19  ⚠ Hotfix
+- **Fixed**: `/install_module <id>` always returned "Bilinmeyen modul"
+  even though `/install_module list` showed the entry. Root cause: the
+  jq query in `resolve_module_id` used:
+  ```
+  select(.id == $q or (.aliases // []) | index($q))
+  ```
+  jq's `|` pipe binds LOWER than `or`, so the expression parsed as:
+  ```
+  select(((.id == $q or .aliases // []) | index($q)))
+  ```
+  which then tried to `index` a boolean → `Cannot index boolean with
+  string`. The error was swallowed by `2>/dev/null` and the function
+  returned an empty string → "unknown module".
+- Fix: wrap both sides of `or` in their own parens. Verified with both
+  exact id and alias queries.
+- The unit test had this case but with parens already present on the
+  right side (`((.aliases // []) | index($q))`), so tests stayed green
+  while prod was broken. Test fixture didn't mirror prod source —
+  follow-up: have tests source the same function rather than copy-paste.
+
 ## v2.17.0 — 2026-05-19
 - **sms-cmd integration** — companion offline SMS backup channel
   module (separate repo, v1.0.0) lets an authorised phone number SMS

@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.17.0"
+BOT_VERSION="v2.17.1"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -909,9 +909,15 @@ fetch_modules_manifest() {
 resolve_module_id() {
     local q="$1" manifest
     manifest=$(fetch_modules_manifest) || return 1
+    # NB: explicit parens around BOTH sides of `or` — jq's `|` binds
+    # weaker than `or`, so without parens `index($q)` got applied to
+    # the boolean result of the `or`, blowing up with:
+    #   Cannot index boolean with string "<query>"
+    # Silently failing meant every /install_module call against an
+    # alias (or even an exact id) returned no match.
     "$JQ" -r --arg q "$q" '
         .modules[] |
-        select(.id == $q or (.aliases // []) | index($q)) |
+        select((.id == $q) or ((.aliases // []) | index($q))) |
         .id' "$manifest" 2>/dev/null | head -1
 }
 
