@@ -1,5 +1,24 @@
 # Changelog
 
+## v2.20.0 — 2026-05-19
+- **`/mitm`** — control surface for the companion mitm-lab module
+  (v1.0.0, ~5 MB Go binary, separate repo). Phase 7 of cep çakısı.
+  Subcommands:
+  - `/mitm`                 — status (PID, CA-present, enabled, client count)
+  - `/mitm gen_ca`          — one-shot self-signed CA generation
+  - `/mitm ca`              — sends `ca.crt` as a Telegram document so
+                              you can install it on a target phone
+  - `/mitm add <ip>`        — queue a hotspot client for MITM
+  - `/mitm remove <ip>`     — un-queue
+  - `/mitm on|off`          — apply / remove iptables redirect
+  - `/mitm list`            — show queued clients
+  - `/mitm flows [N]`       — last N decrypted flow metadata records
+- 19 new MSG keys in en + tr.
+- The module is installed but DISABLED by default. No iptables rules
+  are added until you `/mitm on` after queuing clients. Cert-pinned
+  apps (Telegram, banks, etc.) WILL break for targeted clients —
+  documented in `/mitm ca` and module README.
+
 ## v2.19.0 — 2026-05-19
 - **`/dns_watch`** — live view into AdGuard Home's DNS query log (no
   new Magisk module needed; uses AGH's REST API at

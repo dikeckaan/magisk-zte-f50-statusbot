@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.19.0"
+BOT_VERSION="v2.20.0"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -3121,6 +3121,100 @@ cmd_locate() {
     tf locate_result_fmt "$lat" "$lng" "${acc:-?}" "$lat" "$lng"
 }
 
+# ─── /mitm — control the mitm-lab transparent HTTPS proxy ──────────────
+MITM_DATA=/data/mitm
+MITM_CLIENTS="$MITM_DATA/clients.json"
+MITM_MODULE_DIR=/data/adb/modules/mitm-lab
+
+mitm_present() {
+    [ -d /data/adb/modules/mitm-lab ] || [ -d /data/adb/modules_update/mitm-lab ]
+}
+
+cmd_mitm() {
+    if ! mitm_present; then
+        say "${MSG[mitm_not_installed]}"
+        return
+    fi
+    local sub=$(first_word "$1" | tr '[:upper:]' '[:lower:]')
+    local arg=$(nth_word 2 "$1")
+    case "$sub" in
+        ""|status)
+            local pid n enabled have_ca
+            pid=$(pgrep -f /data/adb/modules/mitm-lab/bin/mitm | head -1)
+            enabled=$("$JQ" -r '.enabled // false' "$MITM_CLIENTS" 2>/dev/null)
+            n=$("$JQ" -r '.clients | length' "$MITM_CLIENTS" 2>/dev/null)
+            [ -s "$MITM_DATA/ca.crt" ] && have_ca=yes || have_ca=no
+            tf mitm_status_fmt "${pid:-stopped}" "$have_ca" "$enabled" "${n:-0}"
+            ;;
+        gen_ca|genca)
+            if [ -s "$MITM_DATA/ca.crt" ]; then
+                say "${MSG[mitm_ca_exists]}"
+                return
+            fi
+            say "${MSG[mitm_gen_ca]}"
+            "$MITM_MODULE_DIR/bin/mitm" -gen-ca \
+                -ca "$MITM_DATA/ca.crt" -key "$MITM_DATA/ca.key" 2>&1 | head -3
+            chmod 644 "$MITM_DATA/ca.crt" 2>/dev/null
+            chmod 600 "$MITM_DATA/ca.key" 2>/dev/null
+            say "${MSG[mitm_ca_done]}"
+            ;;
+        ca)
+            if [ ! -s "$MITM_DATA/ca.crt" ]; then
+                say "${MSG[mitm_no_ca]}"
+                return
+            fi
+            tg_send_document "$chat_id" "$MITM_DATA/ca.crt" "F50-mitm-CA.crt" \
+                "${MSG[mitm_ca_install_help]}" >/dev/null
+            return
+            ;;
+        add)
+            if [ -z "$arg" ]; then say "${MSG[mitm_add_usage]}"; return; fi
+            echo "$arg" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' || {
+                tf mitm_bad_ip_fmt "$arg"; return
+            }
+            [ -f "$MITM_CLIENTS" ] || echo '{"enabled":false,"clients":[]}' > "$MITM_CLIENTS"
+            "$JQ" --arg ip "$arg" '.clients += [$ip] | .clients |= unique' "$MITM_CLIENTS" \
+                > "$MITM_CLIENTS.tmp" && mv "$MITM_CLIENTS.tmp" "$MITM_CLIENTS"
+            chmod 644 "$MITM_CLIENTS"
+            tf mitm_added_fmt "$arg"
+            ;;
+        remove|rm|del)
+            if [ -z "$arg" ]; then say "${MSG[mitm_remove_usage]}"; return; fi
+            "$JQ" --arg ip "$arg" '.clients -= [$ip]' "$MITM_CLIENTS" \
+                > "$MITM_CLIENTS.tmp" && mv "$MITM_CLIENTS.tmp" "$MITM_CLIENTS"
+            chmod 644 "$MITM_CLIENTS"
+            tf mitm_removed_fmt "$arg"
+            ;;
+        on|enable)
+            "$JQ" '.enabled = true' "$MITM_CLIENTS" > "$MITM_CLIENTS.tmp" \
+                && mv "$MITM_CLIENTS.tmp" "$MITM_CLIENTS"
+            chmod 644 "$MITM_CLIENTS"
+            say "${MSG[mitm_enabled]}"
+            ;;
+        off|disable)
+            "$JQ" '.enabled = false' "$MITM_CLIENTS" > "$MITM_CLIENTS.tmp" \
+                && mv "$MITM_CLIENTS.tmp" "$MITM_CLIENTS"
+            chmod 644 "$MITM_CLIENTS"
+            say "${MSG[mitm_disabled]}"
+            ;;
+        list)
+            say "${MSG[mitm_list_header]}"
+            "$JQ" -r '.clients[]' "$MITM_CLIENTS" 2>/dev/null | sed 's/^/  • /'
+            ;;
+        flows)
+            local n=${arg:-20}
+            case "$n" in (''|*[!0-9]*) n=20 ;; esac
+            [ "$n" -gt 50 ] && n=50
+            tf mitm_flows_header_fmt "$n"
+            tail -n "$n" "$MITM_DATA/flows.jsonl" 2>/dev/null | "$JQ" -r '
+                "\(.ts) \(.client) → \(.sni // .dst)  \(.bytes_in)↓/\(.bytes_out)↑ \(.duration // "")"' 2>/dev/null
+            ;;
+        *)
+            say "${MSG[mitm_usage]}"
+            ;;
+    esac
+}
+
 # ─── /dns_watch — read AdGuard Home query log ──────────────────────────
 AGH_API="http://127.0.0.1:3000/control"
 
@@ -4236,6 +4330,14 @@ dispatch() {
         /sms_cmd|/smscmd)              reply=$(cmd_sms_cmd "$args") ;;
         /tor)                          reply=$(cmd_tor "$args") ;;
         /dns_watch|/dnswatch|/dns)     reply=$(cmd_dns_watch "$args") ;;
+        /mitm)
+            # /mitm ca needs to send a document — handle specially
+            local sub=$(first_word "$args" | tr '[:upper:]' '[:lower:]')
+            if [ "$sub" = "ca" ]; then
+                cmd_mitm "$args"
+                return
+            fi
+            reply=$(cmd_mitm "$args") ;;
         # ─── power / kernel ────────────────────────────────────────────
         /cpu_freq|/cpufreq|/freq)      reply=$(cmd_cpu_freq) ;;
         /cpu_governor|/governor|/gov)  reply=$(cmd_cpu_governor "$args") ;;
@@ -4322,7 +4424,7 @@ sms_list sms_count sms_send wifi \
 file screenshot ramclean at modules \
 performance zte_setpw komut reboot version iptal \
 ls cat df du log dump_sms upload \
-connections listening dhcp dns traffic_history adguard spectrum imsi_watch locate ussd sms_cmd tor dns_watch \
+connections listening dhcp dns traffic_history adguard spectrum imsi_watch locate ussd sms_cmd tor dns_watch mitm \
 cpu_freq cpu_governor wakelock \
 freeze unfreeze installed \
 who last_boot bot_stats restart_bot \
