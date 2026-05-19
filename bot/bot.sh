@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.14.0"
+BOT_VERSION="v2.14.1"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -3499,18 +3499,24 @@ poll_auto_alerts() {
 # ─── task poller (runs every loop iteration) ──────────────────────────────
 poll_tasks() {
     local now=$(date +%s)
+    local done_file metafile task_id
+    local chat_id bot_msg_id started   # always pre-declared so a corrupt meta can't leak across iterations
+    local out cmd size truncated pid
+
     for done_file in "$TASK_DIR"/*.done; do
         [ -e "$done_file" ] || continue
-        local task_id=$(basename "$done_file" .done)
-        local metafile="$TASK_DIR/${task_id}.meta"
+        task_id=$(basename "$done_file" .done)
+        metafile="$TASK_DIR/${task_id}.meta"
         [ -f "$metafile" ] || { rm -f "$done_file"; continue; }
-        # Read meta
-        . "$metafile" 2>/dev/null
-        local out=$(head -c "$KOMUT_MAX_OUTPUT" "$TASK_DIR/${task_id}.out" 2>/dev/null)
-        local cmd=$(cat "$TASK_DIR/${task_id}.cmd" 2>/dev/null)
-        local size=$(stat -c %s "$TASK_DIR/${task_id}.out" 2>/dev/null || echo 0)
-        local truncated=""
+        chat_id="" ; bot_msg_id="" ; started=""
+        . "$metafile" 2>/dev/null || { log "bad metafile: $metafile"; rm -f "$done_file" "$metafile"; continue; }
+        [ -n "$chat_id" ] && [ -n "$bot_msg_id" ] || { log "metafile missing chat_id/bot_msg_id: $metafile"; rm -f "$done_file" "$metafile"; continue; }
+        out=$(head -c "$KOMUT_MAX_OUTPUT" "$TASK_DIR/${task_id}.out" 2>/dev/null)
+        cmd=$(cat "$TASK_DIR/${task_id}.cmd" 2>/dev/null)
+        size=$(stat -c %s "$TASK_DIR/${task_id}.out" 2>/dev/null || echo 0)
+        truncated=""
         [ "$size" -gt "$KOMUT_MAX_OUTPUT" ] && truncated=$(printf "${MSG[komut_truncated_fmt]}" "$size")
+        # printf with args is safe — %s arguments are NOT re-interpreted as format specs.
         tg_edit "$chat_id" "$bot_msg_id" "$(printf "${MSG[komut_done_fmt]}" "$cmd" "$out" "$truncated")"
         rm -f "$TASK_DIR/${task_id}.out" "$TASK_DIR/${task_id}.pid" "$TASK_DIR/${task_id}.cmd" "$TASK_DIR/${task_id}.meta" "$TASK_DIR/${task_id}.done"
         log "komut done: task=$task_id"
@@ -3519,26 +3525,26 @@ poll_tasks() {
     # Timeout enforcement
     for metafile in "$TASK_DIR"/*.meta; do
         [ -e "$metafile" ] || continue
-        local task_id=$(basename "$metafile" .meta)
+        task_id=$(basename "$metafile" .meta)
         [ -f "$TASK_DIR/${task_id}.done" ] && continue  # already done
-        . "$metafile" 2>/dev/null
-        if [ -n "$started" ] && [ "$((now - started))" -gt "$KOMUT_TIMEOUT" ]; then
-            local pid=$(cat "$TASK_DIR/${task_id}.pid" 2>/dev/null)
-            if [ -n "$pid" ]; then
-                pkill -TERM -P "$pid" 2>/dev/null
-                kill -TERM "$pid" 2>/dev/null
-                sleep 1
-                pkill -KILL -P "$pid" 2>/dev/null
-                kill -KILL "$pid" 2>/dev/null
-            fi
-            local out=$(head -c "$KOMUT_MAX_OUTPUT" "$TASK_DIR/${task_id}.out" 2>/dev/null)
-            local cmd=$(cat "$TASK_DIR/${task_id}.cmd" 2>/dev/null)
-            tg_edit "$chat_id" "$bot_msg_id" "⏱ Timeout (${KOMUT_TIMEOUT}sn): \$ $cmd
-
-$out"
-            rm -f "$TASK_DIR/${task_id}.out" "$TASK_DIR/${task_id}.pid" "$TASK_DIR/${task_id}.cmd" "$TASK_DIR/${task_id}.meta" "$TASK_DIR/${task_id}.done"
-            log "komut timeout: task=$task_id"
+        chat_id="" ; bot_msg_id="" ; started=""
+        . "$metafile" 2>/dev/null || { log "bad metafile: $metafile"; rm -f "$metafile"; continue; }
+        [ -n "$started" ] || continue
+        [ "$((now - started))" -gt "$KOMUT_TIMEOUT" ] || continue
+        [ -n "$chat_id" ] && [ -n "$bot_msg_id" ] || { log "metafile missing chat_id/bot_msg_id: $metafile"; rm -f "$metafile"; continue; }
+        pid=$(cat "$TASK_DIR/${task_id}.pid" 2>/dev/null)
+        if [ -n "$pid" ]; then
+            pkill -TERM -P "$pid" 2>/dev/null
+            kill -TERM "$pid" 2>/dev/null
+            sleep 1
+            pkill -KILL -P "$pid" 2>/dev/null
+            kill -KILL "$pid" 2>/dev/null
         fi
+        out=$(head -c "$KOMUT_MAX_OUTPUT" "$TASK_DIR/${task_id}.out" 2>/dev/null)
+        cmd=$(cat "$TASK_DIR/${task_id}.cmd" 2>/dev/null)
+        tg_edit "$chat_id" "$bot_msg_id" "$(printf "${MSG[komut_timeout_fmt]:-⏱ Timeout (%ds): \$ %s\n\n%s}" "$KOMUT_TIMEOUT" "$cmd" "$out")"
+        rm -f "$TASK_DIR/${task_id}.out" "$TASK_DIR/${task_id}.pid" "$TASK_DIR/${task_id}.cmd" "$TASK_DIR/${task_id}.meta" "$TASK_DIR/${task_id}.done"
+        log "komut timeout: task=$task_id"
     done
 }
 

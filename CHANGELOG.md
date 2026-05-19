@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.14.1 — 2026-05-19
+- **Fixed**: `poll_tasks` sourced `$metafile` without pre-declaring locals;
+  a corrupt/empty meta file could leak `chat_id` / `bot_msg_id` /
+  `started` from a previous iteration, sending a `/komut` reply to the
+  wrong message id. Now pre-declares + zeroes the trio on every loop
+  iteration and aborts gracefully on parse failure or missing fields.
+- (Investigation note: the alleged `printf "${MSG[komut_done_fmt]}" "$out"`
+  format-injection bug from the audit turned out NOT to be exploitable —
+  printf doesn't re-interpret `%` in positional args, only in the format
+  string. Left a comment for future readers.)
+
 ## v2.14.0 — 2026-05-19
 - **Renamed** `/install` → `/install_module` (clearer when paired with
   `/update`). Old `/install` and `/kur` aliases still work for now.
