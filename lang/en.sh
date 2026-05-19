@@ -618,6 +618,13 @@ Stop: /iptal"
     [komut_done_fmt]="✅ Done: \$ %s
 
 %s%s"
+    [komut_timeout_fmt]="⏱ Timeout (%ds): \$ %s
+
+%s"
+
+    # ─── small format strings for /ls and /sms_list rows ─────────────
+    [ls_header_fmt]="📁 %s"
+    [sms_line_fmt]="📨 %s — %s"
 
     # ─── Chat triggers (informal Turkish patterns matched, translated reply) ─
     [chat_greeting_fmt]="%s, here I am 👋"

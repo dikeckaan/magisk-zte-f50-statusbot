@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.15.0 — 2026-05-19
+- **bot.sh refactor**: introduce `first_word`, `rest_args`, `nth_word`
+  helpers at the top of the file. Migrated ~30 inline
+  `echo "$X" | awk '{print $1}'` subshells and 7 `awk '{$1="";...}'`
+  rest-of-args extractions to use them. Net: ~37 fewer awk forks per
+  command dispatch; same behaviour.
+- **i18n leaks fixed**: `cmd_ls` and the SMS-list loop had hardcoded
+  emoji + label strings (`📁 path` and `📨 when — addr`). They now use
+  new MSG keys `ls_header_fmt` and `sms_line_fmt`. 3 new keys added
+  to both en.sh and tr.sh (`ls_header_fmt`, `sms_line_fmt`,
+  `komut_timeout_fmt`). Lang count: 486 → 489 in both languages.
+- The previously hardcoded Turkish "⏱ Timeout (...sn)" string in
+  poll_tasks's timeout branch now reads from `komut_timeout_fmt`.
+- Function splits for `cmd_komut`/`cmd_tailscale`/`cmd_minimal_mode`/
+  `cmd_update` deferred to Phase 8 (regression risk vs. benefit
+  didn't justify in-place rewrites this pass).
+
 ## v2.14.2 — 2026-05-19
 - **Service migration to `bin-utils/lib/common.sh`**. `service.sh` no longer
   duplicates `find_bash`, log rotation, or token-wait logic — it sources

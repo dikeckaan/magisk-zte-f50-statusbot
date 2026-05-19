@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.14.2"
+BOT_VERSION="v2.15.0"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -37,6 +37,14 @@ fi
 t() { echo "${MSG[$1]:-$1}"; }
 # Translate-format: tf <key> <args...> → printf MSG[key] with args
 tf() { local k=$1; shift; printf "${MSG[$k]:-$k}\n" "$@"; }
+
+# ─── argv helpers (replace ~40 inline `echo|awk` subshell calls) ──────────
+# first_word "<text>"       → first whitespace-delimited token
+# rest_args  "<text>"       → everything after the first token
+# nth_word N "<text>"       → Nth token (1-indexed)
+first_word() { first_word "$1"; }
+rest_args()  { rest_args "$1"; }
+nth_word()   { echo "$2" | awk -v n="$1" '{print $n}'; }
 
 # sendat binary for AT commands - prefer bin-utils, fall back to UFI-TOOLS
 SENDAT=""
@@ -395,8 +403,8 @@ cmd_at() {
     local slot=0
     case "$args" in
         slot=*)
-            slot=$(echo "$args" | awk '{print $1}' | cut -d= -f2)
-            args=$(echo "$args" | awk '{$1=""; sub(/^ /,""); print}')
+            slot=$(first_word "$args" | cut -d= -f2)
+            args=$(rest_args "$args")
             ;;
     esac
 
@@ -610,14 +618,14 @@ cmd_ramclean() {
             ;;
         aggressive|-a|agresif)
             local mode="aggressive"
-            extras=$(echo "$1" | awk '{$1=""; sub(/^ /,""); print}')
+            extras=$(rest_args "$1")
             ;;
         nuke|-n|max)
             local mode="nuke"
             ;;
         *)
             local mode="soft"
-            extras="$arg1 $(echo "$1" | awk '{$1=""; sub(/^ /,""); print}')"
+            extras="$arg1 $(rest_args "$1")"
             ;;
     esac
 
@@ -750,7 +758,7 @@ cmd_ramclean() {
 cmd_ls() {
     local p="${1:-/}"
     [ ! -e "$p" ] && { tf common_not_exists_fmt "$p"; return; }
-    echo "📁 $p"
+    tf ls_header_fmt "$p"
     ls -lah "$p" 2>&1 | head -50
 }
 
@@ -937,7 +945,7 @@ install_module_from_url() {
 }
 
 cmd_install_module() {
-    local arg=$(echo "$1" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
+    local arg=$(first_word "$1" | tr '[:upper:]' '[:lower:]')
     local manifest
     if ! manifest=$(fetch_modules_manifest); then
         echo "${MSG[install_manifest_failed]}"
@@ -999,7 +1007,7 @@ fmt_bytes() {
 }
 
 cmd_traffic_history() {
-    local arg=$(echo "$1" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
+    local arg=$(first_word "$1" | tr '[:upper:]' '[:lower:]')
     if [ "$arg" = "install" ]; then
         cmd_install_module "traffic-stats"
         return
@@ -1070,7 +1078,7 @@ adguard_module_dir() {
     return 1
 }
 cmd_adguard() {
-    local arg=$(echo "$1" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
+    local arg=$(first_word "$1" | tr '[:upper:]' '[:lower:]')
     if [ "$arg" = "install" ]; then
         cmd_install_module "adguardhome"
         return
@@ -1089,7 +1097,7 @@ cmd_adguard() {
     case "$arg" in
         ""|status)
             if [ -n "$pid_line" ]; then
-                local pid=$(echo "$pid_line" | awk '{print $1}')
+                local pid=$(first_word "$pid_line")
                 local rss=$(cat /proc/$pid/status 2>/dev/null | awk '/^VmRSS:/{print $2}')
                 local mem_kb=${rss:-0}
                 local mem_mb=$((mem_kb/1024))
@@ -1407,8 +1415,8 @@ cmd_quiet_hours() {
         return
     fi
     local from to
-    from=$(echo "$args" | awk '{print $1}')
-    to=$(echo "$args" | awk '{print $2}')
+    from=$(first_word "$args")
+    to=$(nth_word 2 "$args")
     case "$from" in ''|*[!0-9]*) echo "${MSG[qh_invalid_from]}"; return ;; esac
     case "$to" in ''|*[!0-9]*) echo "${MSG[qh_invalid_to]}"; return ;; esac
     [ "$from" -lt 0 ] || [ "$from" -gt 23 ] && { echo "${MSG[qh_range_from]}"; return; }
@@ -1466,9 +1474,9 @@ cmd_alarm() {
     local args="$1"
     [ -z "$args" ] && { echo "${MSG[alarm_usage]}"; return; }
     local time_part
-    time_part=$(echo "$args" | awk '{print $1}')
+    time_part=$(first_word "$args")
     local msg
-    msg=$(echo "$args" | awk '{$1=""; sub(/^ /,""); print}')
+    msg=$(rest_args "$args")
     [ -z "$msg" ] && { echo "${MSG[alarm_no_msg]}"; return; }
     local h m
     h=$(echo "$time_part" | cut -d: -f1)
@@ -1501,7 +1509,7 @@ cmd_schedule() {
     # /schedule clear                       → wipe all
     # /schedule cancel <idx>                → remove one by index
     local arg1
-    arg1=$(echo "$1" | awk '{print $1}')
+    arg1=$(first_word "$1")
     case "$arg1" in
         ""|status|list)
             if [ ! -s "$SCHEDULES_FILE" ]; then
@@ -1535,8 +1543,8 @@ cmd_schedule() {
 
     # Recurring schedule: <secs> <command>
     local secs cmd
-    secs=$(echo "$1" | awk '{print $1}')
-    cmd=$(echo "$1" | awk '{$1=""; sub(/^ /,""); print}')
+    secs=$(first_word "$1")
+    cmd=$(rest_args "$1")
     case "$secs" in *[!0-9]*) echo "${MSG[sch_invalid_usage]}"; return ;; esac
     [ -z "$cmd" ] && { echo "${MSG[sch_no_cmd]}"; return; }
     [ "$secs" -lt 10 ] && { echo "${MSG[sch_min_secs]}"; return; }
@@ -1593,8 +1601,8 @@ poll_schedules() {
 dispatch_for_schedule() {
     local text="$1"
     local cmd args
-    cmd=$(echo "$text" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
-    args=$(echo "$text" | awk '{$1=""; sub(/^ /,""); print}')
+    cmd=$(first_word "$text" | tr '[:upper:]' '[:lower:]')
+    args=$(rest_args "$text")
     case "$cmd" in
         /status) cmd_status ;;
         /uptime) echo "⏱ $(fmt_uptime)" ;;
@@ -1726,7 +1734,7 @@ ts_del_iptables() {
 cmd_tailscale() {
     local args="$1"
     local sub
-    sub=$(echo "$args" | awk '{print $1}')
+    sub=$(first_word "$args")
     [ -z "$sub" ] && sub=status
 
     # Resolve binaries lazily — works after install before reboot too
@@ -1837,7 +1845,7 @@ cmd_tailscale() {
             ;;
         auth)
             local key
-            key=$(echo "$args" | awk '{print $2}')
+            key=$(nth_word 2 "$args")
             if [ -z "$key" ]; then
                 echo "${MSG[ts_auth_usage]}"
                 return
@@ -1882,7 +1890,7 @@ cmd_tailscale() {
 # ─── /lang — switch UI language ──────────────────────────────────────────
 cmd_lang() {
     local arg
-    arg=$(echo "$1" | awk '{print $1}' | tr -d ' \r\n')
+    arg=$(first_word "$1" | tr -d ' \r\n')
 
     # No argument: show current + available languages
     if [ -z "$arg" ] || [ "$arg" = "status" ]; then
@@ -1922,7 +1930,7 @@ cmd_lang() {
 # compares with installed version. Optionally installs newer ones.
 cmd_update() {
     local arg
-    arg=$(echo "$1" | awk '{print $1}')
+    arg=$(first_word "$1")
     local target_id
     target_id=$(echo "$1" | awk '{print $2}')
 
@@ -2239,9 +2247,9 @@ cmd_wifi() {
     if [ -r /proc/net/arp ]; then
         while IFS= read -r line; do
             local ip mac iface
-            ip=$(echo "$line" | awk '{print $1}')
-            mac=$(echo "$line" | awk '{print $4}')
-            iface=$(echo "$line" | awk '{print $6}')
+            ip=$(first_word "$line")
+            mac=$(nth_word 4 "$line")
+            iface=$(nth_word 6 "$line")
             [ "$ip" = "IP" ] && continue
             [ "$mac" = "00:00:00:00:00:00" ] && continue
             [ "$iface" != "br0" ] && continue
@@ -2257,8 +2265,8 @@ cmd_sms_send() {
     local args="$2"
     # Parse: first word = number, rest = message
     local num msg
-    num=$(echo "$args" | awk '{print $1}')
-    msg=$(echo "$args" | awk '{$1=""; sub(/^ /,""); print}')
+    num=$(first_word "$args")
+    msg=$(rest_args "$args")
     if [ -z "$num" ] || [ -z "$msg" ]; then
         tg_send "$chat_id" "${MSG[sms_usage]}"
         return
@@ -2422,7 +2430,7 @@ cmd_performance() {
 # hitting 90°C at 2.7 GHz max. Little cluster (policy0) untouched.
 cmd_perf_balanced() {
     local arg
-    arg=$(echo "$1" | awk '{print $1}')
+    arg=$(first_word "$1")
     local mhz=1800
     case "$arg" in
         ""|status)
@@ -2550,7 +2558,7 @@ min_untrack() {
 
 cmd_minimal_mode() {
     local sub
-    sub=$(echo "$1" | awk '{print $1}')
+    sub=$(first_word "$1")
     case "$sub" in
         ""|status)
             local mem_avail disabled_count
@@ -2877,7 +2885,7 @@ cmd_sms_list() {
         ts=$(echo "$tsline" | cut -d= -f2)
         when=$(date -d "@$ts" '+%d.%m %H:%M' 2>/dev/null || echo "?")
         echo ""
-        echo "📨 $when — $addr"
+        tf sms_line_fmt "$when" "$addr"
         echo "   $body"
     done
 }
@@ -2976,9 +2984,9 @@ cmd_clients() {
     local count=0
     if [ -r /proc/net/arp ]; then
         while IFS= read -r line; do
-            ip=$(echo "$line" | awk '{print $1}')
-            mac=$(echo "$line" | awk '{print $4}')
-            iface=$(echo "$line" | awk '{print $6}')
+            ip=$(first_word "$line")
+            mac=$(nth_word 4 "$line")
+            iface=$(nth_word 6 "$line")
             [ "$ip" = "IP" ] && continue
             [ "$mac" = "00:00:00:00:00:00" ] && continue
             echo "  $ip @ $mac ($iface)"
@@ -3054,7 +3062,7 @@ speedtest_start_loop() {
 
 cmd_speedtest() {
     local arg arg2
-    arg=$(echo "$1" | awk '{print $1}')
+    arg=$(first_word "$1")
     arg2=$(echo "$1" | awk '{print $2}')
 
     # ─ Loop detection: scan all args for the keyword "loop"
@@ -3638,9 +3646,9 @@ dispatch() {
         fi
     fi
 
-    local cmd=$(echo "$text" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
+    local cmd=$(first_word "$text" | tr '[:upper:]' '[:lower:]')
     cmd="${cmd%%@*}"
-    local args=$(echo "$text" | awk '{$1=""; sub(/^ /,""); print}')
+    local args=$(rest_args "$text")
 
     local reply=""
     case "$cmd" in
@@ -3656,18 +3664,18 @@ dispatch() {
         /cellinfo|/hucresel|/sim)      reply=$(cmd_cellinfo) ;;
         /imei)                         reply=$(cmd_imei) ;;
         /imei_sorgula|/imeisorgula|/imeicheck)
-            cmd_imei_sorgula "$chat_id" "$(echo "$args" | awk '{print $1}')"
+            cmd_imei_sorgula "$chat_id" "$(first_word "$args")"
             return ;;
         /iptal|/cancel)
             reply=$(cmd_iptal) ;;
         /imei_degis|/imeidegis|/imeichange)
-            reply=$(cmd_imei_degis "$(echo "$args" | awk '{print $1}')" "$(echo "$args" | awk '{print $2}')") ;;
+            reply=$(cmd_imei_degis "$(first_word "$args")" "$(nth_word 2 "$args")") ;;
         /qos|/band)                    reply=$(cmd_qos) ;;
         /sms_list|/smslist|/smsler)    reply=$(cmd_sms_list "$args") ;;
         /sms_count|/smscount|/smssayi) reply=$(cmd_sms_count) ;;
         /sms_send|/smssend|/smsyolla)  cmd_sms_send "$chat_id" "$args"; return ;;
         /wifi|/hotspot)                reply=$(cmd_wifi) ;;
-        /file|/dosya)                  cmd_file "$chat_id" "$(echo "$args" | awk '{print $1}')"; return ;;
+        /file|/dosya)                  cmd_file "$chat_id" "$(first_word "$args")"; return ;;
         /screenshot|/ekran|/ss)        cmd_screenshot "$chat_id"; return ;;
         /ramclean|/ramtemizle|/clean)  reply=$(cmd_ramclean "$args") ;;
         /at)                           reply=$(cmd_at "$args") ;;
@@ -3681,7 +3689,7 @@ dispatch() {
         /perf_help|/perfhelp|/cpuhelp)
             reply=$(cmd_perf_help) ;;
         /performance|/perf|/performans)
-            reply=$(cmd_performance "$(echo "$args" | awk '{print $1}')")
+            reply=$(cmd_performance "$(first_word "$args")")
             # Special: if reply starts with REBOOT_PROMPT|, send with reboot button instead
             case "$reply" in
                 REBOOT_PROMPT\|*)
@@ -3717,16 +3725,16 @@ dispatch() {
         /dhcp|/leases)                 reply=$(cmd_dhcp) ;;
         /dns)                          reply=$(cmd_dns) ;;
         /traffic_history|/traffichistory|/trafic_history|/vnstat)
-            reply=$(cmd_traffic_history "$(echo "$args" | awk '{print $1}')") ;;
+            reply=$(cmd_traffic_history "$(first_word "$args")") ;;
         /adguard|/agh|/adblock)        reply=$(cmd_adguard "$args") ;;
         # ─── power / kernel ────────────────────────────────────────────
         /cpu_freq|/cpufreq|/freq)      reply=$(cmd_cpu_freq) ;;
         /cpu_governor|/governor|/gov)  reply=$(cmd_cpu_governor "$args") ;;
         /wakelock|/wakelocks)          reply=$(cmd_wakelock) ;;
         # ─── apps ──────────────────────────────────────────────────────
-        /freeze|/donduran)             reply=$(cmd_freeze "$(echo "$args" | awk '{print $1}')") ;;
-        /unfreeze|/aktifet)            reply=$(cmd_unfreeze "$(echo "$args" | awk '{print $1}')") ;;
-        /installed|/packages|/paketler) reply=$(cmd_installed "$(echo "$args" | awk '{print $1}')") ;;
+        /freeze|/donduran)             reply=$(cmd_freeze "$(first_word "$args")") ;;
+        /unfreeze|/aktifet)            reply=$(cmd_unfreeze "$(first_word "$args")") ;;
+        /installed|/packages|/paketler) reply=$(cmd_installed "$(first_word "$args")") ;;
         # ─── security / audit ──────────────────────────────────────────
         /who|/sessions|/oturumlar)     reply=$(cmd_who) ;;
         /last_boot|/lastboot|/bootlog) reply=$(cmd_last_boot) ;;
@@ -3742,7 +3750,7 @@ dispatch() {
         /alarm)                        reply=$(cmd_alarm "$args") ;;
         /schedule|/cron|/zamanla)      reply=$(cmd_schedule "$args") ;;
         # ─── upload ────────────────────────────────────────────────────
-        /upload|/yukle)                cmd_upload "$chat_id" "$(echo "$args" | awk '{print $1}')"; return ;;
+        /upload|/yukle)                cmd_upload "$chat_id" "$(first_word "$args")"; return ;;
         # ─── tailscale ─────────────────────────────────────────────────
         /tailscale|/ts)                reply=$(cmd_tailscale "$args") ;;
         /update|/güncelle|/guncelle)   reply=$(cmd_update "$args") ;;

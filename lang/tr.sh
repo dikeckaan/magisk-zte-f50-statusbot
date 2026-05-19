@@ -606,6 +606,13 @@ Durdurmak: /iptal"
     [komut_done_fmt]="✅ Tamamlandı: \$ %s
 
 %s%s"
+    [komut_timeout_fmt]="⏱ Zaman aşımı (%dsn): \$ %s
+
+%s"
+
+    # ─── /ls ve /sms_list satır formatları ───────────────────────────
+    [ls_header_fmt]="📁 %s"
+    [sms_line_fmt]="📨 %s — %s"
 
     # ─── Sohbet tetikleyicileri ──────────────────────────────────────
     [chat_greeting_fmt]="%s, buradayım 👋"
