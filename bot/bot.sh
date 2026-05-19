@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.16.0"
+BOT_VERSION="v2.16.1"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -3093,11 +3093,13 @@ cmd_locate() {
         --argjson rsrp "$rsrp_dbm" \
         '{cellTowers:[{radioType:"lte", mobileCountryCode:$mcc, mobileNetworkCode:$mnc, cellId:$cid, locationAreaCode:$tac, signalStrength:$rsrp}], considerIp:false}')
 
+    # Mozilla Location Service shut down in Sep 2024. BeaconDB is the
+    # community-maintained successor — same JSON schema, anonymous.
     local resp
     resp=$("$CURL" -sS --cacert "$CA" --max-time 15 \
         -H "Content-Type: application/json" \
         --data "$body" \
-        "https://location.services.mozilla.com/v1/geolocate?key=test" 2>/dev/null)
+        "https://api.beacondb.net/v1/geolocate" 2>/dev/null)
 
     local lat lng acc
     lat=$(echo "$resp" | "$JQ" -r '.location.lat // empty' 2>/dev/null)
@@ -3113,32 +3115,18 @@ cmd_locate() {
     tf locate_result_fmt "$lat" "$lng" "${acc:-?}" "$lat" "$lng"
 }
 
-# ─── /ussd — run a USSD shortcode via AT+CUSD ──────────────────────────────
+# ─── /ussd — disabled on this modem ───────────────────────────────────────
+# The UMS9620 modem's AT+CUSD only supports modes 0/1/2 (enable/disable/
+# cancel). Sending a USSD code through AT (e.g. AT+CUSD=1,"*123#",15)
+# returns +CME ERROR: 3 (Operation not allowed). Spreadtrum variants
+# AT+SPUSSD / AT+SUSSD return CME 4 (Not supported).
+# `cmd phone send-ussd-request` doesn't exist on this Android build.
+# `am start -a android.intent.action.CALL -d tel:*123*#` dispatches to
+# the dialer Activity — but F50 is headless, no UI to surface the reply.
+# → /ussd is documented as unavailable on this hardware. Keeping the
+# command so /help mentions it; we just return a clear "not supported".
 cmd_ussd() {
-    if [ ! -x "$SENDAT" ]; then
-        say "${MSG[no_sendat_short]}"
-        return
-    fi
-    local code=$(first_word "$1")
-    if [ -z "$code" ]; then
-        say "${MSG[ussd_usage]}"
-        return
-    fi
-    tf ussd_request_fmt "$code"
-    # AT+CUSD=1,"<code>",15  (15 = GSM 7-bit default alphabet)
-    local resp
-    resp=$(at_cmd "AT+CUSD=1,\"$code\",15")
-    # Sample +CUSD: 0,"Balance is 12.34 TRY",17
-    local m1 m2
-    m1=$(echo "$resp" | sed -n 's/.*+CUSD: *0,"\([^"]*\)".*/\1/p')
-    m2=$(echo "$resp" | sed -n 's/.*+CUSD: *1,"\([^"]*\)".*/\1/p')
-    if [ -n "$m1" ]; then
-        tf ussd_response_fmt "$m1"
-    elif [ -n "$m2" ]; then
-        tf ussd_multistep_fmt "$m2"
-    else
-        tf ussd_failed_fmt "$(echo "$resp" | head -c 300)"
-    fi
+    say "${MSG[ussd_unsupported]}"
 }
 
 cmd_ip() {

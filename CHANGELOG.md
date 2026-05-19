@@ -1,5 +1,23 @@
 # Changelog
 
+## v2.16.1 — 2026-05-19  ⚠ Hotfix
+- **`/locate` switched to BeaconDB**. Mozilla Location Service was shut
+  down in September 2024 — the endpoint returns HTTP 404 now. Replaced
+  with [BeaconDB](https://beacondb.net/) (api.beacondb.net/v1/geolocate)
+  which is the community-maintained successor with identical JSON
+  schema. Verified live: Vodafone TR cell 8504146 resolved to
+  41.003208, 29.155705 ±335 m (İstanbul Beşiktaş).
+- **`/ussd` documented as unavailable.** Investigation revealed the
+  Unisoc UMS9620 modem's `AT+CUSD?` only advertises modes 0/1/2
+  (enable/disable/cancel) — sending an actual code returns CME ERROR 3
+  ("Operation not allowed"). Spreadtrum proprietary variants
+  (AT+SPUSSD / AT+SUSSD) return CME ERROR 4 ("Not supported"). Android
+  `cmd phone send-ussd-request` doesn't exist on this build, and the
+  dialer-intent fallback would need a UI the F50 doesn't have. The
+  command now returns a clear, multi-line explanation instead of a
+  confusing error. Kept in `/help` so a future firmware update can
+  re-enable it without bot changes.
+
 ## v2.16.0 — 2026-05-19
 - **cell-tools integration** — 4 new commands powered by the new
   [cell-tools](https://github.com/dikeckaan/magisk-zte-f50-cell-tools)
