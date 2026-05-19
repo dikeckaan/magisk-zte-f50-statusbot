@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.18.0"
+BOT_VERSION="v2.18.1"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -3131,6 +3131,58 @@ tor_present() {
     [ -d /data/adb/modules/tor-relay ] || [ -d /data/adb/modules_update/tor-relay ]
 }
 
+cmd_tor_through() {
+    local through_file=/data/tor/through_clients.json
+    [ -f "$through_file" ] || {
+        echo '{"enabled":false,"clients":[]}' > "$through_file"
+        chmod 644 "$through_file"
+    }
+    # $1 here is the FULL args passed into cmd_tor, e.g. "through add 192.168.0.5"
+    local sub=$(nth_word 2 "$1" | tr '[:upper:]' '[:lower:]')
+    local arg=$(nth_word 3 "$1")
+    case "$sub" in
+        ""|list)
+            local enabled n
+            enabled=$("$JQ" -r '.enabled' "$through_file")
+            n=$("$JQ" -r '.clients | length' "$through_file")
+            tf tor_through_status_fmt "$enabled" "$n"
+            "$JQ" -r '.clients[]' "$through_file" 2>/dev/null | sed 's/^/  • /'
+            ;;
+        add)
+            if [ -z "$arg" ]; then say "${MSG[tor_through_add_usage]}"; return; fi
+            echo "$arg" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' || {
+                tf tor_through_bad_ip_fmt "$arg"; return
+            }
+            "$JQ" --arg ip "$arg" '.clients += [$ip] | .clients |= unique' "$through_file" \
+                > "$through_file.tmp" && mv "$through_file.tmp" "$through_file"
+            chmod 644 "$through_file"
+            tf tor_through_added_fmt "$arg"
+            ;;
+        remove|rm|del)
+            if [ -z "$arg" ]; then say "${MSG[tor_through_remove_usage]}"; return; fi
+            "$JQ" --arg ip "$arg" '.clients -= [$ip]' "$through_file" \
+                > "$through_file.tmp" && mv "$through_file.tmp" "$through_file"
+            chmod 644 "$through_file"
+            tf tor_through_removed_fmt "$arg"
+            ;;
+        on|enable)
+            "$JQ" '.enabled = true' "$through_file" > "$through_file.tmp" \
+                && mv "$through_file.tmp" "$through_file"
+            chmod 644 "$through_file"
+            say "${MSG[tor_through_enabled]}"
+            ;;
+        off|disable)
+            "$JQ" '.enabled = false' "$through_file" > "$through_file.tmp" \
+                && mv "$through_file.tmp" "$through_file"
+            chmod 644 "$through_file"
+            say "${MSG[tor_through_disabled]}"
+            ;;
+        *)
+            say "${MSG[tor_through_usage]}"
+            ;;
+    esac
+}
+
 cmd_tor() {
     if ! tor_present; then
         say "${MSG[tor_not_installed]}"
@@ -3175,10 +3227,35 @@ cmd_tor() {
             fi
             ;;
         route)
-            say "${MSG[tor_route_header]}"
-            local route
-            route=$(cat "$TOR_DATA/.route_path" 2>/dev/null)
-            tf tor_route_fmt "${route:-unknown}"
+            local mode_arg=$(nth_word 2 "$1" | tr '[:upper:]' '[:lower:]')
+            local target=$(nth_word 3 "$1" | tr '[:upper:]' '[:lower:]')
+            if [ "$mode_arg" = "mode" ] && [ -n "$target" ]; then
+                case "$target" in
+                    direct|cellular|cell)
+                        echo direct > "$TOR_DATA/.route_mode"
+                        say "${MSG[tor_route_mode_direct]}"
+                        ;;
+                    vpn|tailscale|ts)
+                        echo vpn > "$TOR_DATA/.route_mode"
+                        say "${MSG[tor_route_mode_vpn]}"
+                        ;;
+                    *)
+                        say "${MSG[tor_route_mode_usage]}"
+                        ;;
+                esac
+                # Trigger re-apply in service.sh's loop by tickling the file timestamp.
+                # The 60s loop will catch it; for instant effect, kick the supervisor.
+                pkill -USR1 -f /data/adb/modules/tor-relay/service.sh 2>/dev/null
+            else
+                say "${MSG[tor_route_header]}"
+                local mode path
+                mode=$(cat "$TOR_DATA/.route_mode" 2>/dev/null)
+                path=$(cat "$TOR_DATA/.route_path" 2>/dev/null)
+                tf tor_route_fmt "${mode:-direct}" "${path:-unknown}"
+            fi
+            ;;
+        through)
+            cmd_tor_through "$1"
             ;;
         fingerprint|fp)
             local fp

@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.18.1 — 2026-05-19
+- **`/tor route mode {direct|vpn}`** — pin the Tor bridge's own
+  outbound traffic to either the cellular default route (`direct`) or
+  to Tailscale-only (`vpn`, with kill-switch — drops if VPN down).
+  Companion tor-relay v1.1.0 implements the fwmark routing.
+- **`/tor through {add|remove|list|on|off}`** — transparent per-client
+  routing through Tor. Listed IP addresses (typically hotspot phones)
+  get their TCP traffic and DNS queries redirected through tor's
+  `TransPort` (9040) and `DNSPort` (5354). Non-DNS UDP from those
+  clients is DROPPED (Tor is TCP-only — prevents QUIC/WebRTC leaks).
+- Both controls take effect within 60s (the service.sh re-apply loop).
+
 ## v2.18.0 — 2026-05-19
 - **`/tor` integration** — companion tor-relay module (v1.0.0, separate
   repo) brings up a Tor bridge node on this device with bundled
