@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.15.3 — 2026-05-19
+- **SHA-256 verification extended to `/update`** (both `/update all` and
+  `/update <id>`). Previously only `/install_module` verified the
+  downloaded zip; cmd_update would happily run `magisk --install-module`
+  on a corrupted / MITM'd file as long as TLS was OK.
+- The verification logic is now a single `verify_zip_sha256` helper
+  used by both flows. update.json entries without a `sha256` field
+  (pre-callable-workflow legacy releases) print a "no sha256, proceeding"
+  warning and install — graceful degradation, not a hard fail.
+- The test harness's `test_install.sh` covers the helper's three cases
+  (match / mismatch / missing).
+
 ## v2.15.2 — 2026-05-19
 - **SHA-256 integrity verification** for `/install_module` and (by
   extension) the `/adguard install` / `/traffic_history install`

@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.15.2"
+BOT_VERSION="v2.15.3"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -850,6 +850,26 @@ is_module_installed() {
     [ -d "/data/adb/modules/$1" ] || [ -d "/data/adb/modules_update/$1" ]
 }
 
+# verify_zip_sha256 <zip> <expected_sha_or_empty> <mod_id>
+# Returns 0 on match or when expected is empty (graceful legacy release).
+# Returns 1 ONLY on mismatch — caller MUST refuse to install.
+# Always prints a status line via `tf` so the user sees what happened.
+verify_zip_sha256() {
+    local zip="$1" expected="$2" mod_id="$3"
+    if [ -z "$expected" ]; then
+        tf install_sha_missing_fmt "$mod_id"
+        return 0
+    fi
+    local actual
+    actual=$(sha256sum "$zip" 2>/dev/null | awk '{print $1}')
+    if [ -n "$actual" ] && [ "$actual" = "$expected" ]; then
+        tf install_sha_ok_fmt "$mod_id"
+        return 0
+    fi
+    tf install_sha_mismatch_fmt "$mod_id" "$expected" "${actual:-<empty>}"
+    return 1
+}
+
 # Fetch + cache the manifest. Echoes the manifest path on stdout; returns
 # non-zero (with cache untouched) only if there is no cached copy AND the
 # network fetch failed too.
@@ -933,21 +953,10 @@ install_module_from_url() {
         rm -f "$tmp_zip"; tf install_download_failed_fmt "$mod_id"; return 4
     fi
 
-    # Integrity check. update.json's "sha256" field is added by the
-    # reusable release workflow (f50-magisk-modules/.github/workflows/
-    # release-module.yml). Older releases pre-dating that workflow have
-    # no sha256 field — we skip verification then with a warning.
-    if [ -n "$remote_sha" ]; then
-        local actual_sha
-        actual_sha=$(sha256sum "$tmp_zip" 2>/dev/null | awk '{print $1}')
-        if [ -z "$actual_sha" ] || [ "$actual_sha" != "$remote_sha" ]; then
-            rm -f "$tmp_zip"
-            tf install_sha_mismatch_fmt "$mod_id" "$remote_sha" "${actual_sha:-<empty>}"
-            return 6
-        fi
-        tf install_sha_ok_fmt "$mod_id"
-    else
-        tf install_sha_missing_fmt "$mod_id"
+    # Integrity check via the shared helper.
+    if ! verify_zip_sha256 "$tmp_zip" "$remote_sha" "$mod_id"; then
+        rm -f "$tmp_zip"
+        return 6
     fi
 
     tf install_installing_fmt "$mod_id"
@@ -1995,7 +2004,7 @@ cmd_update() {
         all)
             echo "${MSG[update_all_start]}"
             local total=0 updated=0 failed=0
-            local mod_dir update_url cur_id cur_vcode remote_resp remote_ver remote_vcode zipurl
+            local mod_dir update_url cur_id cur_vcode remote_resp remote_ver remote_vcode zipurl remote_sha
             for mod_dir in /data/adb/modules/*/; do
                 [ -f "$mod_dir/module.prop" ] || continue
                 update_url=$(awk -F= '/^updateJson=/{print $2; exit}' "$mod_dir/module.prop")
@@ -2007,6 +2016,7 @@ cmd_update() {
                 remote_vcode=$(echo "$remote_resp" | "$JQ" -r '.versionCode // empty' 2>/dev/null)
                 remote_ver=$(echo "$remote_resp"   | "$JQ" -r '.version // empty' 2>/dev/null)
                 zipurl=$(echo "$remote_resp"       | "$JQ" -r '.zipUrl // empty' 2>/dev/null)
+                remote_sha=$(echo "$remote_resp"   | "$JQ" -r '.sha256 // empty' 2>/dev/null)
                 if [ -z "$remote_vcode" ] || [ "$remote_vcode" -le "$cur_vcode" ] 2>/dev/null; then
                     continue
                 fi
@@ -2018,6 +2028,11 @@ cmd_update() {
                 tf update_downloading_fmt "$cur_id" "$remote_ver"
                 local tmp_zip=/data/local/tmp/.update_$cur_id.zip
                 if "$CURL" -sSL --cacert "$CA" --max-time 300 -o "$tmp_zip" "$zipurl"; then
+                    if ! verify_zip_sha256 "$tmp_zip" "$remote_sha" "$cur_id"; then
+                        rm -f "$tmp_zip"
+                        failed=$((failed+1))
+                        continue
+                    fi
                     if magisk --install-module "$tmp_zip" 2>&1 | grep -q "Done"; then
                         if [ "$cur_id" = "statusbot" ] && [ -f "/data/adb/modules_update/statusbot/bot/bot.sh" ]; then
                             cp /data/adb/modules_update/statusbot/bot/bot.sh /data/adb/modules/statusbot/bot/bot.sh
@@ -2062,6 +2077,8 @@ cmd_update() {
             remote_vcode=$(echo "$remote_resp" | "$JQ" -r '.versionCode // empty' 2>/dev/null)
             remote_ver=$(echo "$remote_resp"   | "$JQ" -r '.version // empty' 2>/dev/null)
             zipurl=$(echo "$remote_resp"       | "$JQ" -r '.zipUrl // empty' 2>/dev/null)
+            local remote_sha
+            remote_sha=$(echo "$remote_resp"   | "$JQ" -r '.sha256 // empty' 2>/dev/null)
             if [ -z "$remote_vcode" ]; then
                 tf update_remote_unread_long_fmt "$(echo "$remote_resp" | head -c 200)"
                 return
@@ -2074,6 +2091,10 @@ cmd_update() {
             local tmp_zip=/data/local/tmp/.update_$cur_id.zip
             "$CURL" -sSL --cacert "$CA" --max-time 300 -o "$tmp_zip" "$zipurl" || {
                 echo "${MSG[update_download_failed]}"; return; }
+            if ! verify_zip_sha256 "$tmp_zip" "$remote_sha" "$cur_id"; then
+                rm -f "$tmp_zip"
+                return
+            fi
             local install_out
             install_out=$(magisk --install-module "$tmp_zip" 2>&1)
             rm -f "$tmp_zip"
