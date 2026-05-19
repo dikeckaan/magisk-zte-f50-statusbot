@@ -13,11 +13,12 @@ ui_print "  Boot greeting + selam responder"
 ui_print "=================================="
 ui_print ""
 
-# Sanity: bin-utils must be installed (provides curl + jq)
-if [ ! -d /data/adb/modules/bin-utils ] && [ ! -f /system/bin/curl -o ! -f /system/bin/jq ]; then
-    ui_print "[!] HATA: bin-utils modülü kurulu degil."
-    ui_print "    Once bin-utils.zip flashla, sonra bu modulu."
-    abort "[!] Dependency missing: bin-utils (curl + jq)"
+# Sanity: bin-utils v1.3.0+ must be installed (provides curl, jq, bash, lib/common.sh)
+if [ ! -r /data/adb/modules/bin-utils/lib/common.sh ] \
+   && [ ! -r /data/adb/modules_update/bin-utils/lib/common.sh ]; then
+    ui_print "[!] HATA: bin-utils v1.3.0+ kurulu degil (lib/common.sh yok)."
+    ui_print "    Once bin-utils v1.3.0.zip flashla, sonra bu modulu."
+    abort "[!] Dependency missing: bin-utils v1.3.0+ (curl, jq, bash, common.sh)"
 fi
 
 mkdir -p "$DATADIR"

@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.14.2 — 2026-05-19
+- **Service migration to `bin-utils/lib/common.sh`**. `service.sh` no longer
+  duplicates `find_bash`, log rotation, or token-wait logic — it sources
+  the shared helper library and calls `find_bash`, `wait_for_file`,
+  `log_line`, `log_rotate` directly. Net: 54 → 41 lines.
+- **`customize.sh` now hard-requires bin-utils v1.3.0+** at install time
+  (the file `/data/adb/modules/bin-utils/lib/common.sh` must exist).
+  Old "just check for curl/jq" guard is gone.
+
 ## v2.14.1 — 2026-05-19
 - **Fixed**: `poll_tasks` sourced `$metafile` without pre-declaring locals;
   a corrupt/empty meta file could leak `chat_id` / `bot_msg_id` /
