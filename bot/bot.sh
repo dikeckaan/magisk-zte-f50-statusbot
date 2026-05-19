@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.15.3"
+BOT_VERSION="v2.15.4"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -1158,10 +1158,26 @@ cmd_adguard() {
             ;;
         off|stop)
             if [ -z "$pid_line" ]; then
+                # Even if the daemon is already dead, make sure iptables is
+                # clean — otherwise hotspot clients quietly lose DNS because
+                # br0:53 still routes to a port no one listens on.
+                while iptables -t nat -D PREROUTING -i br0 -p udp --dport 53 \
+                        -j REDIRECT --to-ports 5353 2>/dev/null; do :; done
+                while iptables -t nat -D PREROUTING -i br0 -p tcp --dport 53 \
+                        -j REDIRECT --to-ports 5353 2>/dev/null; do :; done
                 echo "${MSG[agh_already_stopped]}"
             else
                 pkill -f "$bin" 2>/dev/null
                 pkill -f "$svc" 2>/dev/null
+                # Drop the iptables NAT redirect too. With AGH off and the
+                # rule still in place, hotspot clients' DNS queries would
+                # hit a dead port. Removing the rule lets ZTE firmware's
+                # default DNAT-to-1.1.1.1 (the rule directly below ours)
+                # take over — clients keep working, just unfiltered.
+                while iptables -t nat -D PREROUTING -i br0 -p udp --dport 53 \
+                        -j REDIRECT --to-ports 5353 2>/dev/null; do :; done
+                while iptables -t nat -D PREROUTING -i br0 -p tcp --dport 53 \
+                        -j REDIRECT --to-ports 5353 2>/dev/null; do :; done
                 sleep 1
                 echo "${MSG[agh_stopped]}"
             fi

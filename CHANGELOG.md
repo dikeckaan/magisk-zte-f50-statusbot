@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.15.4 — 2026-05-19
+- **Fixed**: `/adguard off` used to kill the AdGuard Home daemon but
+  leave the `iptables -t nat -A PREROUTING ... REDIRECT --to-ports 5353`
+  rule in place. Result: hotspot clients silently lost DNS (queries
+  routed to a dead port), making the WiFi seem like "internet is down"
+  even though the host device's own internet was fine. Now `off` also
+  drops both UDP and TCP redirect rules; hotspot clients fall back to
+  ZTE firmware's default DNAT-to-1.1.1.1 (unfiltered DNS, but working
+  internet).
+- `/adguard on` re-asserts the rules via the existing supervisor path,
+  so the on/off cycle is symmetric.
+- `agh_stopped` message updated in en.sh + tr.sh to reflect the new
+  behaviour.
+
 ## v2.15.3 — 2026-05-19
 - **SHA-256 verification extended to `/update`** (both `/update all` and
   `/update <id>`). Previously only `/install_module` verified the
