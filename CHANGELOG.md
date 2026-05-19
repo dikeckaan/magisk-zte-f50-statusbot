@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.11.0
+- **10 new community-seeded translations**: Spanish, German, French,
+  Portuguese, Russian, Mandarin (Simplified), Japanese, Korean, Arabic,
+  Hindi (`es`, `de`, `fr`, `pt`, `ru`, `zh`, `ja`, `ko`, `ar`, `hi`).
+- Each new language covers ~74 high-frequency keys (help text, /status,
+  /performance, /lang, alerts, common errors, chat replies). Missing keys
+  fall back to English — bot stays fully functional in every language.
+- Total: **12 languages** now selectable via `/lang <code>`.
+- README + `lang/README.md` updated with the full language matrix.
+- The Telegram side-menu (`setMyCommands`) is still EN/TR-only for now;
+  English fallback applies in other languages for menu descriptions.
+
 ## v2.10.2
 - **Telegram /-menu fully translated**: setMyCommands descriptions now switch
   with /lang en|tr (re-registered each language change).

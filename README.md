@@ -85,7 +85,35 @@ State is persisted to `/data/statusbot/{schedules.txt,heartbeat.conf,quiet_hours
 - `/restart_bot` — supervisor restarts within ~10 s
 
 ### 💬 Chat-style triggers
-"selam", "merhaba", "sa", "naber", "saat", "iyi misin", "teşekkür", "günaydın", "iyi geceler" — all match informally and reply naturally.
+"selam", "merhaba", "sa", "naber", "saat", "iyi misin", "teşekkür", "günaydın", "iyi geceler" — all match informally and reply naturally (in your chosen UI language).
+
+### 🌍 Multi-language UI (12 languages)
+
+statusbot's user-facing text is translatable. The bot replies in your
+selected language across all commands, help text, alerts, and the Telegram
+side-menu (`setMyCommands`).
+
+| Code | Language | Coverage |
+|---|---|---|
+| `en` | **English** *(default + fallback)* | ✅ full (449 keys) |
+| `tr` | **Türkçe** | ✅ full (449 keys) |
+| `es` | Español | seeded (96 keys, rest → English) |
+| `de` | Deutsch | seeded (74 keys) |
+| `fr` | Français | seeded (74 keys) |
+| `pt` | Português | seeded (74 keys) |
+| `ru` | Русский | seeded (74 keys) |
+| `zh` | 简体中文 | seeded (74 keys) |
+| `ja` | 日本語 | seeded (74 keys) |
+| `ko` | 한국어 | seeded (74 keys) |
+| `ar` | العربية | seeded (74 keys) |
+| `hi` | हिन्दी | seeded (74 keys) |
+
+Switch from the bot: `/lang en`, `/lang tr`, `/lang es`, etc. The choice
+persists across reboots. Missing keys in a partial translation gracefully
+fall back to English — the bot never breaks on incomplete coverage.
+
+To add a language or extend coverage, drop a `lang/<code>.sh` file and open
+a PR — see [`lang/README.md`](lang/README.md) for the format.
 
 ## Requirements
 

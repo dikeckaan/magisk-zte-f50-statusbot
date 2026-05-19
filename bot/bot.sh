@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.10.2"
+BOT_VERSION="v2.11.0"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
