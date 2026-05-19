@@ -1,5 +1,23 @@
 # Changelog
 
+## v2.12.0 — 2026-05-19
+- **`/traffic_history [iface]`** — reads the
+  [traffic-stats](https://github.com/dikeckaan/magisk-zte-f50-traffic-stats)
+  vnstat-lite DB at `/data/traffic-stats/` and reports per-interface
+  Today / 7-day / Month RX+TX totals. Optional iface arg filters to a
+  single interface (e.g. `/traffic_history sipa_eth0` for just cellular).
+- **`/adguard {status|on|off|log|url}`** — controls the
+  [adguardhome](https://github.com/dikeckaan/magisk-zte-f50-adguardhome)
+  daemon. `status` reports PID, RAM, today's query / blocked counts.
+  `on`/`off` start and stop the daemon (frees ~50–80 MB when off).
+  `log` tails the supervisor log. `url` prints the web UI URL using the
+  live `br0` gateway IP.
+- Both new commands appear in the Telegram side-menu and are translated
+  in `en.sh` + `tr.sh` (16 new keys each). Other languages fall back to
+  English as usual.
+- No new external deps — both integrations just read filesystem state
+  and call iptables / pkill / nohup.
+
 ## v2.11.0
 - **10 new community-seeded translations**: Spanish, German, French,
   Portuguese, Russian, Mandarin (Simplified), Japanese, Korean, Arabic,

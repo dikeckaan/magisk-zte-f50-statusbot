@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.11.0"
+BOT_VERSION="v2.12.0"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -827,6 +827,162 @@ cmd_dhcp() {
     [ "$cnt" -eq 0 ] && echo "${MSG[dhcp_none]}"
     echo
     tf dhcp_total_fmt "$cnt"
+}
+
+# ─── traffic-stats integration (vnstat-lite DB at /data/traffic-stats) ────
+fmt_bytes() {
+    local b="$1"
+    [ -z "$b" ] || [ "$b" -lt 1 ] 2>/dev/null && { echo "0 B"; return; }
+    if [ "$b" -lt 1024 ]; then printf "%d B" "$b"
+    elif [ "$b" -lt 1048576 ]; then printf "%.1f KB" "$(echo "$b/1024" | bc -l 2>/dev/null || echo $((b/1024)))"
+    elif [ "$b" -lt 1073741824 ]; then printf "%.1f MB" "$(echo "$b/1048576" | bc -l 2>/dev/null || echo $((b/1048576)))"
+    else printf "%.2f GB" "$(echo "$b/1073741824" | bc -l 2>/dev/null || echo $((b/1073741824)))"
+    fi
+}
+
+cmd_traffic_history() {
+    local db=/data/traffic-stats
+    if [ ! -d "$db" ]; then
+        echo "${MSG[traffic_hist_not_installed]}"
+        return
+    fi
+    local arg="$1"
+    local today=$(date +%Y-%m-%d)
+    local month_prefix=$(date +%Y-%m)
+    local week_ago=$(date -d "7 days ago" +%Y-%m-%d 2>/dev/null || date -v-7d +%Y-%m-%d 2>/dev/null)
+
+    echo "${MSG[traffic_hist_header]}"
+    echo
+    local iface idir rx_today tx_today rx_week tx_week rx_month tx_month
+    local f rx tx printed=0
+    for idir in "$db"/*/; do
+        [ -d "$idir" ] || continue
+        iface=$(basename "$idir")
+        case "$iface" in
+            .snapshot|.snapshot.tmp|daemon.log*) continue ;;
+        esac
+        # Optional iface filter
+        [ -n "$arg" ] && [ "$arg" != "$iface" ] && continue
+
+        rx_today=0; tx_today=0
+        rx_week=0;  tx_week=0
+        rx_month=0; tx_month=0
+
+        # Today
+        f="$idir$today"
+        if [ -r "$f" ]; then
+            rx=$(awk -F= '/^rx=/{print $2}' "$f"); tx=$(awk -F= '/^tx=/{print $2}' "$f")
+            rx_today=${rx:-0}; tx_today=${tx:-0}
+        fi
+        # Aggregate
+        for f in "$idir"*; do
+            [ -f "$f" ] || continue
+            local fn=$(basename "$f")
+            case "$fn" in
+                [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+                *) continue ;;
+            esac
+            rx=$(awk -F= '/^rx=/{print $2}' "$f"); tx=$(awk -F= '/^tx=/{print $2}' "$f")
+            rx_month=$(( rx_month + ${rx:-0} ))
+            tx_month=$(( tx_month + ${tx:-0} ))
+            if [ -n "$week_ago" ] && [ "$fn" \> "$week_ago" ] || [ "$fn" = "$week_ago" ]; then
+                rx_week=$(( rx_week + ${rx:-0} ))
+                tx_week=$(( tx_week + ${tx:-0} ))
+            fi
+        done
+
+        printf "${MSG[traffic_hist_iface_fmt]}\n" "$iface" \
+            "$(fmt_bytes "$rx_today")" "$(fmt_bytes "$tx_today")" \
+            "$(fmt_bytes "$rx_week")"  "$(fmt_bytes "$tx_week")" \
+            "$(fmt_bytes "$rx_month")" "$(fmt_bytes "$tx_month")"
+        printed=$((printed+1))
+    done
+    [ "$printed" -eq 0 ] && echo "${MSG[traffic_hist_empty]}"
+}
+
+# ─── AdGuard Home integration (module adguardhome) ────────────────────────
+adguard_module_dir() {
+    for p in /data/adb/modules/adguardhome /data/adb/modules_update/adguardhome; do
+        [ -d "$p" ] && { echo "$p"; return 0; }
+    done
+    return 1
+}
+cmd_adguard() {
+    local arg=$(echo "$1" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
+    local moddir
+    if ! moddir=$(adguard_module_dir); then
+        echo "${MSG[agh_not_installed]}"
+        return
+    fi
+    local bin="$moddir/system/bin/AdGuardHome"
+    local data=/data/adguardhome
+    local svc="$moddir/service.sh"
+    local pid_line
+    pid_line=$(pgrep -fa "$bin" 2>/dev/null | head -1)
+
+    case "$arg" in
+        ""|status)
+            if [ -n "$pid_line" ]; then
+                local pid=$(echo "$pid_line" | awk '{print $1}')
+                local rss=$(cat /proc/$pid/status 2>/dev/null | awk '/^VmRSS:/{print $2}')
+                local mem_kb=${rss:-0}
+                local mem_mb=$((mem_kb/1024))
+                local blocked_today=0 queries_today=0
+                if [ -r "$data/stats.db" ]; then
+                    # Stats are in a SQLite — without sqlite3 we just report from querylog if present
+                    :
+                fi
+                if [ -r "$data/querylog.json" ]; then
+                    local today=$(date +%Y-%m-%d)
+                    queries_today=$(grep -c "\"T\":\"$today" "$data/querylog.json" 2>/dev/null || echo 0)
+                    blocked_today=$(grep -c "\"Result\":{\"IsFiltered\":true" "$data/querylog.json" 2>/dev/null || echo 0)
+                fi
+                printf "${MSG[agh_status_running_fmt]}" "$pid" "$mem_mb" "$queries_today" "$blocked_today"
+            else
+                echo "${MSG[agh_status_stopped]}"
+            fi
+            ;;
+        on|start)
+            if [ -n "$pid_line" ]; then
+                echo "${MSG[agh_already_running]}"
+            else
+                nohup sh "$svc" >/dev/null 2>&1 &
+                sleep 2
+                if pgrep -f "$bin" >/dev/null 2>&1; then
+                    echo "${MSG[agh_started]}"
+                else
+                    echo "${MSG[agh_start_failed]}"
+                fi
+            fi
+            ;;
+        off|stop)
+            if [ -z "$pid_line" ]; then
+                echo "${MSG[agh_already_stopped]}"
+            else
+                pkill -f "$bin" 2>/dev/null
+                pkill -f "$svc" 2>/dev/null
+                sleep 1
+                echo "${MSG[agh_stopped]}"
+            fi
+            ;;
+        log|logs)
+            if [ -r "$data/daemon.log" ]; then
+                echo "${MSG[agh_log_header]}"
+                tail -n 30 "$data/daemon.log"
+            else
+                echo "${MSG[agh_no_log]}"
+            fi
+            ;;
+        url|web)
+            local gw
+            gw=$(ip -4 addr show br0 2>/dev/null | awk '/inet /{sub("/.*","",$2);print $2; exit}')
+            [ -z "$gw" ] && gw="192.168.0.1"
+            printf "${MSG[agh_url_fmt]}" "http://$gw:3000"
+            ;;
+        *)
+            echo "${MSG[agh_help]}"
+            ;;
+    esac
 }
 
 # ─── power / kernel ───────────────────────────────────────────────────────
@@ -3386,6 +3542,9 @@ dispatch() {
         /listening|/listen|/ports)     reply=$(cmd_listening) ;;
         /dhcp|/leases)                 reply=$(cmd_dhcp) ;;
         /dns)                          reply=$(cmd_dns) ;;
+        /traffic_history|/traffichistory|/trafic_history|/vnstat)
+            reply=$(cmd_traffic_history "$(echo "$args" | awk '{print $1}')") ;;
+        /adguard|/agh|/adblock)        reply=$(cmd_adguard "$args") ;;
         # ─── power / kernel ────────────────────────────────────────────
         /cpu_freq|/cpufreq|/freq)      reply=$(cmd_cpu_freq) ;;
         /cpu_governor|/governor|/gov)  reply=$(cmd_cpu_governor "$args") ;;
@@ -3460,7 +3619,7 @@ sms_list sms_count sms_send wifi \
 file screenshot ramclean at modules \
 performance zte_setpw komut reboot version iptal \
 ls cat df du log dump_sms upload \
-connections listening dhcp dns \
+connections listening dhcp dns traffic_history adguard \
 cpu_freq cpu_governor wakelock \
 freeze unfreeze installed \
 who last_boot bot_stats restart_bot \
