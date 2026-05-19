@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.15.4"
+BOT_VERSION="v2.15.5"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -1119,7 +1119,12 @@ cmd_adguard() {
     local data=/data/adguardhome
     local svc="$moddir/service.sh"
     local pid_line
-    pid_line=$(pgrep -fa "$bin" 2>/dev/null | head -1)
+    # NB: the Go binary's argv[0] is the basename "AdGuardHome" (not the
+    # full /data/adb/modules/.../AdGuardHome path we used to invoke it).
+    # `pgrep -fa "$bin"` (full path) thus returns no matches even when
+    # the daemon is alive. Match the case-sensitive basename instead —
+    # nothing else on Android has that capitalisation.
+    pid_line=$(pgrep -fa AdGuardHome 2>/dev/null | head -1)
 
     case "$arg" in
         ""|status)
@@ -1167,7 +1172,8 @@ cmd_adguard() {
                         -j REDIRECT --to-ports 5353 2>/dev/null; do :; done
                 echo "${MSG[agh_already_stopped]}"
             else
-                pkill -f "$bin" 2>/dev/null
+                # Match by basename — same reason as pgrep above.
+                pkill -f AdGuardHome 2>/dev/null
                 pkill -f "$svc" 2>/dev/null
                 # Drop the iptables NAT redirect too. With AGH off and the
                 # rule still in place, hotspot clients' DNS queries would

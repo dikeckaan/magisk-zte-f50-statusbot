@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.15.5 — 2026-05-19  ⚠ Hotfix
+- **`/adguard off` and `/adguard status` were lying.** Bot probed for
+  the daemon with `pgrep -fa "$moddir/system/bin/AdGuardHome"` (the full
+  invocation path). But AdGuard's Go runtime sets `argv[0]` to just the
+  basename `AdGuardHome` — so the live cmdline is
+  `AdGuardHome --no-check-update --work-dir ...`, with no path prefix.
+  pgrep -f never matched. Bot reported "already stopped" / "stopped"
+  while the daemon was actually running, and the new v2.15.4 iptables
+  cleanup logic was skipped because the bot thought there was nothing
+  to clean up.
+- Fix: search by basename `AdGuardHome` (case-sensitive — nothing else
+  on Android shares that capitalisation). Same regex used by pgrep AND
+  pkill so the off path now actually kills the daemon.
+
 ## v2.15.4 — 2026-05-19
 - **Fixed**: `/adguard off` used to kill the AdGuard Home daemon but
   leave the `iptables -t nat -A PREROUTING ... REDIRECT --to-ports 5353`
