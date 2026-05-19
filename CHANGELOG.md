@@ -1,5 +1,25 @@
 # Changelog
 
+## v2.19.0 — 2026-05-19
+- **`/dns_watch`** — live view into AdGuard Home's DNS query log (no
+  new Magisk module needed; uses AGH's REST API at
+  `http://127.0.0.1:3000/control`). Subcommands:
+  - `/dns_watch` or `/dns_watch recent [N]` — last N DNS queries with
+    timestamp, client IP, hostname, type, blocked status
+  - `/dns_watch top` — top queried + top blocked + top clients (last 24h)
+  - `/dns_watch blocked [N]` — last N blocked queries
+  - `/dns_watch client <ip>` — that client's DNS history
+  - `/dns_watch stats` — totals
+- This is the lighter pivot from the originally-planned tls-watch (JA3
+  fingerprint logger). The Termux/Android ecosystem lacks a static
+  tcpdump/tshark/ssldump binary for ARM64, so deep TLS Client-Hello
+  parsing would have required a custom C build. AdGuard's DNS log
+  already captures *who* talks to *what hostname* — the same intel
+  SNI-sniffing would have given us, without packet capture overhead.
+- 10 new MSG keys in en + tr.
+- Note: AGH's `file_enabled` query log option must be true (now seeded
+  by the adguardhome module's customize.sh for fresh installs).
+
 ## v2.18.1 — 2026-05-19
 - **`/tor route mode {direct|vpn}`** — pin the Tor bridge's own
   outbound traffic to either the cellular default route (`direct`) or

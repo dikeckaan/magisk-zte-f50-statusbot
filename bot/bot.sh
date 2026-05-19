@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.18.1"
+BOT_VERSION="v2.19.0"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -3121,6 +3121,82 @@ cmd_locate() {
     tf locate_result_fmt "$lat" "$lng" "${acc:-?}" "$lat" "$lng"
 }
 
+# ─── /dns_watch — read AdGuard Home query log ──────────────────────────
+AGH_API="http://127.0.0.1:3000/control"
+
+cmd_dns_watch() {
+    if ! adguard_module_dir >/dev/null 2>&1; then
+        say "${MSG[agh_not_installed]}"
+        return
+    fi
+    local sub=$(first_word "$1" | tr '[:upper:]' '[:lower:]')
+    local arg=$(nth_word 2 "$1")
+    case "$sub" in
+        ""|recent|last)
+            local n=${arg:-20}
+            case "$n" in (''|*[!0-9]*) n=20 ;; esac
+            [ "$n" -gt 50 ] && n=50
+            tf dns_recent_header_fmt "$n"
+            local resp
+            resp=$("$CURL" -sS --max-time 5 "$AGH_API/querylog?limit=$n" 2>/dev/null)
+            echo "$resp" | "$JQ" -r '.data[] |
+                "\(.time | sub("\\..*"; "") | sub("T"; " ")) "
+                + .client + " "
+                + (.question.name // "?")
+                + " ["
+                + (.question.type // "?")
+                + "] "
+                + (if .result.IsFiltered then "🛡 blocked" else "✓" end)' 2>/dev/null \
+                | head -50 | tail -n "$n"
+            ;;
+        top)
+            say "${MSG[dns_top_header]}"
+            local resp
+            resp=$("$CURL" -sS --max-time 5 "$AGH_API/stats" 2>/dev/null)
+            echo "$resp" | "$JQ" -r '.top_queried_domains[0:10] | .[] | to_entries[] | "  \(.value)×  \(.key)"' 2>/dev/null
+            echo
+            say "${MSG[dns_top_blocked_header]}"
+            echo "$resp" | "$JQ" -r '.top_blocked_domains[0:10] | .[] | to_entries[] | "  🛡 \(.value)×  \(.key)"' 2>/dev/null
+            echo
+            say "${MSG[dns_top_clients_header]}"
+            echo "$resp" | "$JQ" -r '.top_clients[0:5] | .[] | to_entries[] | "  \(.value)q  \(.key)"' 2>/dev/null
+            ;;
+        blocked)
+            local n=${arg:-20}
+            case "$n" in (''|*[!0-9]*) n=20 ;; esac
+            tf dns_blocked_header_fmt "$n"
+            local resp
+            resp=$("$CURL" -sS --max-time 5 "$AGH_API/querylog?limit=$n&response_status=blocked" 2>/dev/null)
+            echo "$resp" | "$JQ" -r '.data[] |
+                "\(.time | sub("\\..*"; "") | sub("T"; " ")) "
+                + .client + " 🛡 " + .question.name' 2>/dev/null | head -50
+            ;;
+        client)
+            if [ -z "$arg" ]; then say "${MSG[dns_client_usage]}"; return; fi
+            tf dns_client_header_fmt "$arg"
+            local resp
+            resp=$("$CURL" -sS --max-time 5 "$AGH_API/querylog?limit=200" 2>/dev/null)
+            echo "$resp" | "$JQ" -r --arg ip "$arg" '
+                .data[]
+                | select(.client == $ip)
+                | "\(.time | sub("\\..*"; "") | sub("T"; " ")) "
+                  + .question.name
+                  + (if .result.IsFiltered then " 🛡" else "" end)' 2>/dev/null | head -40
+            ;;
+        stats)
+            local resp num_q num_b avg
+            resp=$("$CURL" -sS --max-time 5 "$AGH_API/stats" 2>/dev/null)
+            num_q=$(echo "$resp" | "$JQ" -r '.num_dns_queries')
+            num_b=$(echo "$resp" | "$JQ" -r '.num_blocked_filtering')
+            avg=$(echo "$resp"   | "$JQ" -r '.avg_processing_time')
+            tf dns_stats_fmt "$num_q" "$num_b" "$avg"
+            ;;
+        *)
+            say "${MSG[dns_watch_usage]}"
+            ;;
+    esac
+}
+
 # ─── /tor — control the tor-relay bridge node ──────────────────────────
 TOR_DATA=/data/tor
 TOR_LOG="$TOR_DATA/tor.log"
@@ -4159,6 +4235,7 @@ dispatch() {
         /ussd|/shortcode)              reply=$(cmd_ussd "$args") ;;
         /sms_cmd|/smscmd)              reply=$(cmd_sms_cmd "$args") ;;
         /tor)                          reply=$(cmd_tor "$args") ;;
+        /dns_watch|/dnswatch|/dns)     reply=$(cmd_dns_watch "$args") ;;
         # ─── power / kernel ────────────────────────────────────────────
         /cpu_freq|/cpufreq|/freq)      reply=$(cmd_cpu_freq) ;;
         /cpu_governor|/governor|/gov)  reply=$(cmd_cpu_governor "$args") ;;
@@ -4245,7 +4322,7 @@ sms_list sms_count sms_send wifi \
 file screenshot ramclean at modules \
 performance zte_setpw komut reboot version iptal \
 ls cat df du log dump_sms upload \
-connections listening dhcp dns traffic_history adguard spectrum imsi_watch locate ussd sms_cmd tor \
+connections listening dhcp dns traffic_history adguard spectrum imsi_watch locate ussd sms_cmd tor dns_watch \
 cpu_freq cpu_governor wakelock \
 freeze unfreeze installed \
 who last_boot bot_stats restart_bot \
