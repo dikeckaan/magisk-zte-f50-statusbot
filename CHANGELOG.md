@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.21.0 — 2026-05-19
+- **`/sip`** — status surface for the new `sip-server` module + the
+  `com.f50.sip` F50SipBridge Android app (Phase 8). Subcommands:
+  - `/sip`               — sipserver PID/uptime, UDP/5060 socket state,
+    declared users, active registrations from the last log dump, and
+    whether F50SipBridge is installed/running
+  - `/sip log`           — last 20 lines of `/data/sip-server/daemon.log`
+  - `/sip users`         — usernames from `sip_users.conf`
+  - `/sip restart`       — kill sipserver; supervisor relaunches in ~10 s
+- Wired `/sip` (alias `/voip`) into command dispatch and Telegram
+  `register_commands` so it shows up in the slash-menu.
+
 ## v2.20.0 — 2026-05-19
 - **`/mitm`** — control surface for the companion mitm-lab module
   (v1.0.0, ~5 MB Go binary, separate repo). Phase 7 of cep çakısı.

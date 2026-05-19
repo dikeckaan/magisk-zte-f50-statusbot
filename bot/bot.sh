@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.20.0"
+BOT_VERSION="v2.21.0"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -3543,6 +3543,86 @@ cmd_ip() {
     fmt_local_ips
 }
 
+# ─── /sip — status of the embedded SIP server + F50SipBridge app ────────
+SIP_DAEMON_LOG=/data/sip-server/daemon.log
+SIP_USERS_CONF=/data/sip-server/sip_users.conf
+SIP_APP_PKG=com.f50.sip
+
+sip_server_present() {
+    [ -d /data/adb/modules/sip-server ] || [ -d /data/adb/modules_update/sip-server ]
+}
+
+cmd_sip() {
+    if ! sip_server_present; then
+        echo "❌ sip-server modülü kurulu değil. /install_module sip-server"
+        return
+    fi
+    local sub=$(first_word "$1" | tr '[:upper:]' '[:lower:]')
+    case "$sub" in
+        ""|status)
+            local pid up=""
+            pid=$(pgrep -f '/system/bin/sipserver|/data/adb/modules/sip-server' 2>/dev/null | head -1)
+            if [ -n "$pid" ] && [ -d "/proc/$pid" ]; then
+                local stime now
+                stime=$(stat -c %Y "/proc/$pid" 2>/dev/null)
+                now=$(date +%s)
+                up=" (PID $pid, $(( (now - stime) / 60 )) dk)"
+                echo "✅ sipserver çalışıyor$up"
+            else
+                echo "❌ sipserver çalışmıyor"
+            fi
+            echo
+            echo "🔌 UDP/5060: $(ss -ulnp 2>/dev/null | awk '/:5060/{print $4; exit}' || echo '?')"
+            echo
+            echo "👥 Kayıtlı kullanıcılar:"
+            if [ -r "$SIP_USERS_CONF" ]; then
+                awk -F: '/^[^#]/{print "  • "$1}' "$SIP_USERS_CONF" | head -20
+            else
+                echo "  (sip_users.conf yok)"
+            fi
+            echo
+            echo "📡 Aktif kayıtlar (son 30 sn içinde dump edilenler):"
+            grep "Active registrations:" "$SIP_DAEMON_LOG" 2>/dev/null | tail -1
+            grep -A20 "Active registrations:" "$SIP_DAEMON_LOG" 2>/dev/null | tail -20 | grep "^.*->" | sed 's/^/  /'
+            echo
+            echo "📱 F50SipBridge app:"
+            if pm path "$SIP_APP_PKG" >/dev/null 2>&1; then
+                local app_pid
+                app_pid=$(pgrep -f "$SIP_APP_PKG" | head -1)
+                if [ -n "$app_pid" ]; then
+                    echo "  ✅ kurulu, çalışıyor (PID $app_pid)"
+                else
+                    echo "  ⚠ kurulu, çalışmıyor — am start-foreground-service $SIP_APP_PKG/.SipForegroundService"
+                fi
+            else
+                echo "  ❌ kurulu değil (F50SipBridge.apk eksik)"
+            fi
+            ;;
+        log)
+            echo "📜 Son 20 satır $SIP_DAEMON_LOG:"
+            echo '```'
+            tail -20 "$SIP_DAEMON_LOG" 2>/dev/null
+            echo '```'
+            ;;
+        users)
+            echo "👥 sip_users.conf:"
+            echo '```'
+            awk -F: '/^[^#]/{print $1}' "$SIP_USERS_CONF" 2>/dev/null
+            echo '```'
+            ;;
+        restart)
+            echo "♻️ sipserver yeniden başlatılıyor..."
+            pkill -f /system/bin/sipserver 2>/dev/null
+            pkill -f /data/adb/modules/sip-server 2>/dev/null
+            sleep 1
+            echo "  service.sh supervisor 10 sn içinde yeniden başlatır."
+            ;;
+        *)
+            echo "Usage: /sip [status|log|users|restart]"
+            ;;
+    esac
+}
+
 cmd_modules() {
     say "${MSG[modules_header]}"
     for d in /data/adb/modules/*/; do
@@ -4328,6 +4408,7 @@ dispatch() {
         /locate|/where|/konum)         reply=$(cmd_locate) ;;
         /ussd|/shortcode)              reply=$(cmd_ussd "$args") ;;
         /sms_cmd|/smscmd)              reply=$(cmd_sms_cmd "$args") ;;
+        /sip|/voip)                    reply=$(cmd_sip "$args") ;;
         /tor)                          reply=$(cmd_tor "$args") ;;
         /dns_watch|/dnswatch|/dns)     reply=$(cmd_dns_watch "$args") ;;
         /mitm)
@@ -4424,7 +4505,7 @@ sms_list sms_count sms_send wifi \
 file screenshot ramclean at modules \
 performance zte_setpw komut reboot version iptal \
 ls cat df du log dump_sms upload \
-connections listening dhcp dns traffic_history adguard spectrum imsi_watch locate ussd sms_cmd tor dns_watch mitm \
+connections listening dhcp dns traffic_history adguard spectrum imsi_watch locate ussd sms_cmd sip tor dns_watch mitm \
 cpu_freq cpu_governor wakelock \
 freeze unfreeze installed \
 who last_boot bot_stats restart_bot \
