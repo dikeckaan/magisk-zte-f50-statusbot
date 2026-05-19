@@ -1,7 +1,7 @@
 {
-    "version": "v2.15.6",
-    "versionCode": 26,
-    "zipUrl": "https://github.com/dikeckaan/magisk-zte-f50-statusbot/releases/download/v2.15.6/statusbot-v2.15.6.zip",
-    "sha256": "39444a51c7a6e0e8d29d0e0a2b74df0ab12d7bcc0fd929b59967716eb901f5e6",
+    "version": "v2.16.0",
+    "versionCode": 27,
+    "zipUrl": "https://github.com/dikeckaan/magisk-zte-f50-statusbot/releases/download/v2.16.0/statusbot-v2.16.0.zip",
+    "sha256": "08839d05ebbb7dc8a3ed07f27482d125b91d32de99096d479780de022a2fe46b",
     "changelog": "https://raw.githubusercontent.com/dikeckaan/magisk-zte-f50-statusbot/main/CHANGELOG.md"
 }
