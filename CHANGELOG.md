@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.13.0 — 2026-05-19
+- **`/install [list|<id>]`** — bot-side optional-module installer. Reads
+  each module's `updateJson` from a built-in catalog, downloads the zip,
+  and calls `magisk --install-module`. No more manual ADB flashing for
+  optional modules.
+- Current catalog: `adguardhome`, `traffic-stats`. Friendly aliases
+  recognised: `/install adguard` → `adguardhome`, `/install traffic`
+  → `traffic-stats`.
+- `/install list` prints what's installed and what's still available.
+- `/adguard install` and `/traffic_history install` are shortcuts for
+  the same flow.
+- 14 new lang keys (en + tr); other languages fall back to English.
+
 ## v2.12.0 — 2026-05-19
 - **`/traffic_history [iface]`** — reads the
   [traffic-stats](https://github.com/dikeckaan/magisk-zte-f50-traffic-stats)

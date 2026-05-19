@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.12.0"
+BOT_VERSION="v2.13.0"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -829,6 +829,95 @@ cmd_dhcp() {
     tf dhcp_total_fmt "$cnt"
 }
 
+# ─── optional-module installer (used by /install and /adguard install etc.) ──
+# Catalog of optional modules: id -> updateJson URL
+declare -gA OPTIONAL_MODULES=(
+    [adguardhome]="https://raw.githubusercontent.com/dikeckaan/magisk-zte-f50-adguardhome/main/update.json"
+    [traffic-stats]="https://raw.githubusercontent.com/dikeckaan/magisk-zte-f50-traffic-stats/main/update.json"
+)
+
+is_module_installed() {
+    [ -d "/data/adb/modules/$1" ] || [ -d "/data/adb/modules_update/$1" ]
+}
+
+# install_module_from_url <mod_id> <updateJson_url> — fetches version info,
+# downloads zip, calls `magisk --install-module`. Prints status as it goes.
+# Returns 0 on success, non-zero on failure.
+install_module_from_url() {
+    local mod_id="$1"
+    local update_url="$2"
+    local remote_resp remote_ver remote_vcode zipurl tmp_zip install_out
+
+    if is_module_installed "$mod_id"; then
+        tf install_already_present_fmt "$mod_id"
+        return 1
+    fi
+
+    tf install_fetching_fmt "$mod_id"
+    remote_resp=$("$CURL" -sSL --cacert "$CA" --max-time 15 "$update_url" 2>/dev/null)
+    if [ -z "$remote_resp" ]; then
+        tf install_meta_failed_fmt "$mod_id"; return 2
+    fi
+    remote_ver=$(echo   "$remote_resp" | "$JQ" -r '.version // empty'     2>/dev/null)
+    remote_vcode=$(echo "$remote_resp" | "$JQ" -r '.versionCode // empty' 2>/dev/null)
+    zipurl=$(echo       "$remote_resp" | "$JQ" -r '.zipUrl // empty'      2>/dev/null)
+    if [ -z "$zipurl" ] || [ -z "$remote_ver" ]; then
+        tf install_parse_failed_fmt "$mod_id"; return 3
+    fi
+
+    tf install_downloading_fmt "$mod_id" "$remote_ver"
+    tmp_zip="/data/local/tmp/.install_${mod_id}.zip"
+    "$CURL" -sSL --cacert "$CA" --max-time 300 -o "$tmp_zip" "$zipurl" || {
+        rm -f "$tmp_zip"; tf install_download_failed_fmt "$mod_id"; return 4; }
+    local size=$(stat -c %s "$tmp_zip" 2>/dev/null || echo 0)
+    if [ "$size" -lt 1024 ]; then
+        rm -f "$tmp_zip"; tf install_download_failed_fmt "$mod_id"; return 4
+    fi
+
+    tf install_installing_fmt "$mod_id"
+    install_out=$(magisk --install-module "$tmp_zip" 2>&1)
+    rm -f "$tmp_zip"
+    if echo "$install_out" | grep -q "Done"; then
+        tf install_success_fmt "$mod_id" "$remote_ver"
+        return 0
+    else
+        tf install_failed_fmt "$mod_id" "$(echo "$install_out" | tail -3)"
+        return 5
+    fi
+}
+
+cmd_install() {
+    local arg=$(echo "$1" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
+    if [ -z "$arg" ] || [ "$arg" = "list" ]; then
+        echo "${MSG[install_list_header]}"
+        echo
+        local id status
+        for id in "${!OPTIONAL_MODULES[@]}"; do
+            if is_module_installed "$id"; then
+                tf install_list_installed_fmt "$id"
+            else
+                tf install_list_available_fmt "$id"
+            fi
+        done
+        echo
+        echo "${MSG[install_usage]}"
+        return
+    fi
+    # Allow friendly aliases
+    case "$arg" in
+        adguard|agh|adblock) arg=adguardhome ;;
+        traffic|vnstat)      arg=traffic-stats ;;
+    esac
+    local url="${OPTIONAL_MODULES[$arg]}"
+    if [ -z "$url" ]; then
+        tf install_unknown_fmt "$arg"
+        return
+    fi
+    install_module_from_url "$arg" "$url"
+    echo
+    echo "${MSG[install_reboot_hint]}"
+}
+
 # ─── traffic-stats integration (vnstat-lite DB at /data/traffic-stats) ────
 fmt_bytes() {
     local b="$1"
@@ -841,12 +930,19 @@ fmt_bytes() {
 }
 
 cmd_traffic_history() {
+    local arg=$(echo "$1" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
+    if [ "$arg" = "install" ]; then
+        install_module_from_url "traffic-stats" \
+            "${OPTIONAL_MODULES[traffic-stats]}"
+        echo
+        echo "${MSG[install_reboot_hint]}"
+        return
+    fi
     local db=/data/traffic-stats
     if [ ! -d "$db" ]; then
         echo "${MSG[traffic_hist_not_installed]}"
         return
     fi
-    local arg="$1"
     local today=$(date +%Y-%m-%d)
     local month_prefix=$(date +%Y-%m)
     local week_ago=$(date -d "7 days ago" +%Y-%m-%d 2>/dev/null || date -v-7d +%Y-%m-%d 2>/dev/null)
@@ -909,6 +1005,13 @@ adguard_module_dir() {
 }
 cmd_adguard() {
     local arg=$(echo "$1" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
+    if [ "$arg" = "install" ]; then
+        install_module_from_url "adguardhome" \
+            "${OPTIONAL_MODULES[adguardhome]}"
+        echo
+        echo "${MSG[install_reboot_hint]}"
+        return
+    fi
     local moddir
     if ! moddir=$(adguard_module_dir); then
         echo "${MSG[agh_not_installed]}"
@@ -3572,6 +3675,7 @@ dispatch() {
         # ─── tailscale ─────────────────────────────────────────────────
         /tailscale|/ts)                reply=$(cmd_tailscale "$args") ;;
         /update|/güncelle|/guncelle)   reply=$(cmd_update "$args") ;;
+        /install|/kur|/yukle_modul)    reply=$(cmd_install "$args") ;;
         /lang|/dil|/language)          reply=$(cmd_lang "$args") ;;
         *)
             local lc=$(echo "$text" | tr '[:upper:]' '[:lower:]' | tr -d ' .,!?')
@@ -3624,7 +3728,7 @@ cpu_freq cpu_governor wakelock \
 freeze unfreeze installed \
 who last_boot bot_stats restart_bot \
 quiet_hours heartbeat alarm schedule \
-tailscale perf_balanced perf_help minimal_mode speedtest update lang"
+tailscale perf_balanced perf_help minimal_mode speedtest update install lang"
 
 # JSON-escape a string for setMyCommands body (handles backslash + dquote)
 json_escape() {

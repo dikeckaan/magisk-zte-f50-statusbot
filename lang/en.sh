@@ -419,6 +419,7 @@ On confirmation the device will REBOOT."
     [desc_minimal_mode]="Freeze non-essential services (~640 MB)"
     [desc_speedtest]="Speed test - /speedtest [provider] [size]"
     [desc_update]="Update modules from GitHub - /update [all|<id>]"
+    [desc_install]="Install optional module - /install [list|<id>]"
     [desc_lang]="Change bot language - /lang [code]"
 
     # ─── inline button captions (tg_send_with_cancel, reboot) ───────
@@ -461,6 +462,23 @@ On confirmation the device will REBOOT."
     [dhcp_clients_header]="👥 Active clients (ip neigh dev br0):"
     [dhcp_none]="  (none)"
     [dhcp_total_fmt]="Total: %d device(s)"
+
+    # ─── /install — optional-module installer ────────────────────────
+    [install_list_header]="📦 Optional modules"
+    [install_list_installed_fmt]="  ✅ %s  (installed)"
+    [install_list_available_fmt]="  ⬇  %s  (available — /install %s)"
+    [install_usage]="Usage:\n  /install <id>   — install module from GitHub\n  /install list   — show this list\n  Aliases: adguard → adguardhome, traffic → traffic-stats"
+    [install_unknown_fmt]="❌ Unknown module: %s. Try /install list."
+    [install_already_present_fmt]="ℹ️ %s is already installed. Use /update %s to upgrade."
+    [install_fetching_fmt]="🔎 Fetching latest release info for %s ..."
+    [install_meta_failed_fmt]="❌ Could not fetch update.json for %s. Check internet."
+    [install_parse_failed_fmt]="❌ update.json for %s is malformed (missing version or zipUrl)."
+    [install_downloading_fmt]="⬇  Downloading %s %s ..."
+    [install_download_failed_fmt]="❌ Download failed for %s."
+    [install_installing_fmt]="📥 Installing %s via magisk ..."
+    [install_success_fmt]="✅ %s %s installed successfully."
+    [install_failed_fmt]="❌ magisk install for %s failed:\n%s"
+    [install_reboot_hint]="ℹ️ Reboot to activate the new module. Use /reboot when ready."
 
     # ─── /traffic_history (traffic-stats module) ─────────────────────
     [traffic_hist_not_installed]="📊 traffic-stats module is not installed. Flash it from github.com/dikeckaan/magisk-zte-f50-traffic-stats and reboot."
