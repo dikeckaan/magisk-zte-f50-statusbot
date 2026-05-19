@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.17.1"
+BOT_VERSION="v2.18.0"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -3121,6 +3121,88 @@ cmd_locate() {
     tf locate_result_fmt "$lat" "$lng" "${acc:-?}" "$lat" "$lng"
 }
 
+# ─── /tor — control the tor-relay bridge node ──────────────────────────
+TOR_DATA=/data/tor
+TOR_LOG="$TOR_DATA/tor.log"
+TOR_MODULE_DIR=/data/adb/modules/tor-relay
+TOR_PORT=9001
+
+tor_present() {
+    [ -d /data/adb/modules/tor-relay ] || [ -d /data/adb/modules_update/tor-relay ]
+}
+
+cmd_tor() {
+    if ! tor_present; then
+        say "${MSG[tor_not_installed]}"
+        return
+    fi
+    local sub=$(first_word "$1" | tr '[:upper:]' '[:lower:]')
+    local tor_pid
+    tor_pid=$(pgrep -f /data/adb/modules/tor-relay/bin/tor 2>/dev/null | head -1)
+
+    case "$sub" in
+        ""|status)
+            if [ -n "$tor_pid" ]; then
+                local rss_kb mem_mb route bootstrap circuits fp
+                rss_kb=$(awk '/^VmRSS:/{print $2}' /proc/"$tor_pid"/status 2>/dev/null)
+                mem_mb=$(( ${rss_kb:-0} / 1024 ))
+                route=$(cat "$TOR_DATA/.route_path" 2>/dev/null)
+                bootstrap=$(grep -oE 'Bootstrapped [0-9]+%' "$TOR_LOG" 2>/dev/null | tail -1)
+                circuits=$(grep -c "New circuit" "$TOR_LOG" 2>/dev/null || echo 0)
+                fp=$(grep -oE "identity key fingerprint is '[^']+'" "$TOR_LOG" 2>/dev/null | head -1 | sed -E "s/.*'(.+)'.*/\1/")
+                printf "${MSG[tor_status_running_fmt]}" "$tor_pid" "$mem_mb" "${bootstrap:-(starting)}" "${route:-?}" "$circuits"
+                [ -n "$fp" ] && printf "\nFingerprint: %s" "$fp"
+            else
+                say "${MSG[tor_status_stopped]}"
+            fi
+            ;;
+        on|start)
+            if [ -n "$tor_pid" ]; then
+                say "${MSG[tor_already_running]}"
+            else
+                nohup sh "$TOR_MODULE_DIR/service.sh" >/dev/null 2>&1 &
+                sleep 5
+                say "${MSG[tor_started]}"
+            fi
+            ;;
+        off|stop)
+            if [ -z "$tor_pid" ]; then
+                say "${MSG[tor_already_stopped]}"
+            else
+                pkill -f "$TOR_MODULE_DIR/bin/tor" 2>/dev/null
+                pkill -f "$TOR_MODULE_DIR/service.sh" 2>/dev/null
+                say "${MSG[tor_stopped]}"
+            fi
+            ;;
+        route)
+            say "${MSG[tor_route_header]}"
+            local route
+            route=$(cat "$TOR_DATA/.route_path" 2>/dev/null)
+            tf tor_route_fmt "${route:-unknown}"
+            ;;
+        fingerprint|fp)
+            local fp
+            fp=$(grep -oE "identity key fingerprint is '[^']+'" "$TOR_LOG" 2>/dev/null | head -1 | sed -E "s/.*'(.+)'.*/\1/")
+            if [ -n "$fp" ]; then
+                tf tor_fingerprint_fmt "$fp"
+            else
+                say "${MSG[tor_fp_not_ready]}"
+            fi
+            ;;
+        log|logs)
+            if [ -r "$TOR_LOG" ]; then
+                say "${MSG[tor_log_header]}"
+                tail -n 20 "$TOR_LOG"
+            else
+                say "${MSG[tor_no_log]}"
+            fi
+            ;;
+        *)
+            say "${MSG[tor_usage]}"
+            ;;
+    esac
+}
+
 # ─── /sms_cmd — manage the sms-cmd offline backup channel ───────────────
 SMS_CMD_CONFIG=/data/sms-cmd/config.json
 
@@ -3999,6 +4081,7 @@ dispatch() {
         /locate|/where|/konum)         reply=$(cmd_locate) ;;
         /ussd|/shortcode)              reply=$(cmd_ussd "$args") ;;
         /sms_cmd|/smscmd)              reply=$(cmd_sms_cmd "$args") ;;
+        /tor)                          reply=$(cmd_tor "$args") ;;
         # ─── power / kernel ────────────────────────────────────────────
         /cpu_freq|/cpufreq|/freq)      reply=$(cmd_cpu_freq) ;;
         /cpu_governor|/governor|/gov)  reply=$(cmd_cpu_governor "$args") ;;
@@ -4085,7 +4168,7 @@ sms_list sms_count sms_send wifi \
 file screenshot ramclean at modules \
 performance zte_setpw komut reboot version iptal \
 ls cat df du log dump_sms upload \
-connections listening dhcp dns traffic_history adguard spectrum imsi_watch locate ussd sms_cmd \
+connections listening dhcp dns traffic_history adguard spectrum imsi_watch locate ussd sms_cmd tor \
 cpu_freq cpu_governor wakelock \
 freeze unfreeze installed \
 who last_boot bot_stats restart_bot \

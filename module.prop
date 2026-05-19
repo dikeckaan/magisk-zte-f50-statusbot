@@ -1,7 +1,7 @@
 id=statusbot
 name=Telegram Status Bot
-version=v2.17.1
-versionCode=30
+version=v2.18.0
+versionCode=31
 author=kaandikec
-description=Telegram bot for rooted Android (ZTE F50). 12-language UI. Cep çakısı features: cell-tools integration (/spectrum, /imsi_watch, /locate via BeaconDB), sms-cmd management (/sms_cmd offline SMS backup channel). + status/AT/shell/perf/IMEI/SMS/wifi/network/power/scheduling/tailscale/speedtest/update/install_module/sha256 verify. Requires bin-utils v1.3.0+.
+description=Telegram bot for rooted Android (ZTE F50). 12-language UI. Cep çakısı: cell-tools (/spectrum, /imsi_watch, /locate), sms-cmd (/sms_cmd offline SMS), tor-relay (/tor bridge). + status/AT/shell/perf/IMEI/SMS/wifi/network/power/scheduling/tailscale/speedtest/update/install_module/sha256 verify. Requires bin-utils v1.3.0+.
 updateJson=https://raw.githubusercontent.com/dikeckaan/magisk-zte-f50-statusbot/main/update.json

@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.18.0 — 2026-05-19
+- **`/tor` integration** — companion tor-relay module (v1.0.0, separate
+  repo) brings up a Tor bridge node on this device with bundled
+  OpenSSL/libevent libraries. This release adds the bot-side controls:
+  - `/tor` or `/tor status` — PID, RAM, bootstrap %, current route
+    path (Tailscale/cellular), circuit count, bridge fingerprint
+  - `/tor on|off` — start / stop daemon
+  - `/tor route` — show current outbound routing decision
+  - `/tor fingerprint` — share with private bridge users
+  - `/tor log` — last 20 lines of tor.log
+- Phase 4 of "cep çakısı" plan ships. Verified live: bridge
+  bootstraps, connects to public relays (137.74.115.48, 109.69.66.221),
+  identity fingerprint generated.
+
 ## v2.17.1 — 2026-05-19  ⚠ Hotfix
 - **Fixed**: `/install_module <id>` always returned "Bilinmeyen modul"
   even though `/install_module list` showed the entry. Root cause: the
