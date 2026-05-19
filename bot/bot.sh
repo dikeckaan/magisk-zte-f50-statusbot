@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.13.0"
+BOT_VERSION="v2.13.1"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -95,7 +95,9 @@ tg_send_with_cancel() {
 
 tg_send_with_reboot() {
     # $1 chat_id, $2 text
-    local kb='{"inline_keyboard":[[{"text":"${MSG[btn_reboot_now]}","callback_data":"reboot_now"}]]}'
+    local btn_esc
+    btn_esc=$(json_escape "${MSG[btn_reboot_now]:-🔁 Reboot Now}")
+    local kb="{\"inline_keyboard\":[[{\"text\":\"$btn_esc\",\"callback_data\":\"reboot_now\"}]]}"
     "$CURL" -sS --cacert "$CA" --max-time 15 \
         "${TG_API}${TOKEN}/sendMessage" \
         -d "chat_id=$1" \
@@ -913,9 +915,11 @@ cmd_install() {
         tf install_unknown_fmt "$arg"
         return
     fi
-    install_module_from_url "$arg" "$url"
-    echo
-    echo "${MSG[install_reboot_hint]}"
+    if install_module_from_url "$arg" "$url"; then
+        echo
+        echo "${MSG[install_reboot_hint]}"
+        echo "<<REBOOT_BUTTON>>"
+    fi
 }
 
 # ─── traffic-stats integration (vnstat-lite DB at /data/traffic-stats) ────
@@ -932,10 +936,12 @@ fmt_bytes() {
 cmd_traffic_history() {
     local arg=$(echo "$1" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
     if [ "$arg" = "install" ]; then
-        install_module_from_url "traffic-stats" \
-            "${OPTIONAL_MODULES[traffic-stats]}"
-        echo
-        echo "${MSG[install_reboot_hint]}"
+        if install_module_from_url "traffic-stats" \
+                "${OPTIONAL_MODULES[traffic-stats]}"; then
+            echo
+            echo "${MSG[install_reboot_hint]}"
+            echo "<<REBOOT_BUTTON>>"
+        fi
         return
     fi
     local db=/data/traffic-stats
@@ -1006,10 +1012,12 @@ adguard_module_dir() {
 cmd_adguard() {
     local arg=$(echo "$1" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
     if [ "$arg" = "install" ]; then
-        install_module_from_url "adguardhome" \
-            "${OPTIONAL_MODULES[adguardhome]}"
-        echo
-        echo "${MSG[install_reboot_hint]}"
+        if install_module_from_url "adguardhome" \
+                "${OPTIONAL_MODULES[adguardhome]}"; then
+            echo
+            echo "${MSG[install_reboot_hint]}"
+            echo "<<REBOOT_BUTTON>>"
+        fi
         return
     fi
     local moddir
@@ -1953,6 +1961,7 @@ cmd_update() {
                 if grep -q "statusbot.*✅" /data/statusbot/bot.log.tmp 2>/dev/null; then
                     ( sleep 3; kill $(cat "$DATADIR/bot.pid" 2>/dev/null) ) &
                 fi
+                echo "<<REBOOT_BUTTON>>"
             fi ;;
         *)
             local mod_dir="/data/adb/modules/$arg"
@@ -1995,6 +2004,7 @@ cmd_update() {
                     ( sleep 5; kill $(cat "$DATADIR/bot.pid" 2>/dev/null) ) &
                 else
                     tf update_other_installed_fmt "$cur_id" "$remote_ver"
+                    echo "<<REBOOT_BUTTON>>"
                 fi
             else
                 tf update_install_failed_long_fmt "$(echo "$install_out" | tail -5)"
@@ -3697,6 +3707,16 @@ dispatch() {
                 *) return ;;
             esac
             ;;
+    esac
+
+    # Reboot-button marker: any command can append a line "<<REBOOT_BUTTON>>" to
+    # its output; we strip the marker line and attach an inline Reboot button.
+    case "$reply" in
+        *"<<REBOOT_BUTTON>>"*)
+            local clean
+            clean=$(echo "$reply" | grep -v '^<<REBOOT_BUTTON>>$')
+            tg_send_with_reboot "$chat_id" "$clean"
+            return ;;
     esac
 
     [ -n "$reply" ] && tg_send "$chat_id" "$reply" "$msg_id" >/dev/null

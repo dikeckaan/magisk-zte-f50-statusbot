@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.13.1 — 2026-05-19
+- **Inline Reboot button** after a module install or update succeeds.
+  `/update`, `/update <id>`, `/install <id>`, `/adguard install`, and
+  `/traffic_history install` now end their reply with a tappable
+  "🔁 Reboot Now" button when something was actually flashed and a
+  reboot is required for activation. Tapping it triggers the existing
+  `reboot_now` callback.
+- **Fixed**: `tg_send_with_reboot` was sending the literal string
+  `${MSG[btn_reboot_now]}` as the button label because the JSON was
+  single-quoted (no expansion). The button now renders the localised
+  "Reboot Now" label from the lang file.
+- New convention: any command can append `<<REBOOT_BUTTON>>` on its own
+  line to its output, and the dispatcher will strip that line and attach
+  the inline reboot button. This complements the older
+  `REBOOT_PROMPT|<text>` prefix used by `/performance`.
+
 ## v2.13.0 — 2026-05-19
 - **`/install [list|<id>]`** — bot-side optional-module installer. Reads
   each module's `updateJson` from a built-in catalog, downloads the zip,
