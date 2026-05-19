@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.13.1"
+BOT_VERSION="v2.14.0"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -831,15 +831,63 @@ cmd_dhcp() {
     tf dhcp_total_fmt "$cnt"
 }
 
-# ─── optional-module installer (used by /install and /adguard install etc.) ──
-# Catalog of optional modules: id -> updateJson URL
-declare -gA OPTIONAL_MODULES=(
-    [adguardhome]="https://raw.githubusercontent.com/dikeckaan/magisk-zte-f50-adguardhome/main/update.json"
-    [traffic-stats]="https://raw.githubusercontent.com/dikeckaan/magisk-zte-f50-traffic-stats/main/update.json"
-)
+# ─── optional-module installer ────────────────────────────────────────────
+# Catalog is fetched from the f50-magisk-modules aggregator repo so that
+# adding a new module to the ecosystem doesn't require a bot release.
+MODULES_MANIFEST_URL="https://raw.githubusercontent.com/dikeckaan/f50-magisk-modules/main/modules.json"
+MODULES_MANIFEST_CACHE="/data/statusbot/.modules.json"
+MODULES_MANIFEST_TTL=600   # seconds
 
 is_module_installed() {
     [ -d "/data/adb/modules/$1" ] || [ -d "/data/adb/modules_update/$1" ]
+}
+
+# Fetch + cache the manifest. Echoes the manifest path on stdout; returns
+# non-zero (with cache untouched) only if there is no cached copy AND the
+# network fetch failed too.
+fetch_modules_manifest() {
+    local now age
+    now=$(date +%s)
+    if [ -r "$MODULES_MANIFEST_CACHE" ]; then
+        age=$(( now - $(stat -c %Y "$MODULES_MANIFEST_CACHE" 2>/dev/null || echo 0) ))
+        if [ "$age" -lt "$MODULES_MANIFEST_TTL" ]; then
+            echo "$MODULES_MANIFEST_CACHE"
+            return 0
+        fi
+    fi
+    local tmp="$MODULES_MANIFEST_CACHE.tmp"
+    if "$CURL" -sSL --cacert "$CA" --max-time 15 \
+            -o "$tmp" "$MODULES_MANIFEST_URL" 2>/dev/null \
+       && "$JQ" -e '.modules | type == "array"' "$tmp" >/dev/null 2>&1; then
+        mv "$tmp" "$MODULES_MANIFEST_CACHE"
+        echo "$MODULES_MANIFEST_CACHE"
+        return 0
+    fi
+    rm -f "$tmp"
+    if [ -r "$MODULES_MANIFEST_CACHE" ]; then
+        echo "$MODULES_MANIFEST_CACHE"
+        return 0
+    fi
+    return 1
+}
+
+# Resolve user-typed id (or alias) → canonical module id via the manifest.
+# Echoes the canonical id on stdout, returns 1 if not found.
+resolve_module_id() {
+    local q="$1" manifest
+    manifest=$(fetch_modules_manifest) || return 1
+    "$JQ" -r --arg q "$q" '
+        .modules[] |
+        select(.id == $q or (.aliases // []) | index($q)) |
+        .id' "$manifest" 2>/dev/null | head -1
+}
+
+# Lookup update_json URL for a canonical module id.
+lookup_module_url() {
+    local id="$1" manifest
+    manifest=$(fetch_modules_manifest) || return 1
+    "$JQ" -r --arg id "$id" '
+        .modules[] | select(.id == $id) | .update_json' "$manifest" 2>/dev/null | head -1
 }
 
 # install_module_from_url <mod_id> <updateJson_url> — fetches version info,
@@ -888,34 +936,51 @@ install_module_from_url() {
     fi
 }
 
-cmd_install() {
+cmd_install_module() {
     local arg=$(echo "$1" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
+    local manifest
+    if ! manifest=$(fetch_modules_manifest); then
+        echo "${MSG[install_manifest_failed]}"
+        return
+    fi
+
     if [ -z "$arg" ] || [ "$arg" = "list" ]; then
         echo "${MSG[install_list_header]}"
         echo
-        local id status
-        for id in "${!OPTIONAL_MODULES[@]}"; do
+        local id name desc required
+        # Walk every entry in the manifest. tab-separated for safe parsing.
+        "$JQ" -r '.modules[] | [.id, (.name // .id), .description, (if .required then "1" else "0" end)] | @tsv' \
+            "$manifest" 2>/dev/null | \
+        while IFS="$(printf '\t')" read -r id name desc required; do
             if is_module_installed "$id"; then
-                tf install_list_installed_fmt "$id"
+                printf "  ✅ %s  %s\n" "$id" "${MSG[install_list_state_installed]}"
+            elif [ "$required" = "1" ]; then
+                printf "  ⚠️ %s  %s\n" "$id" "${MSG[install_list_state_missing_required]}"
             else
-                tf install_list_available_fmt "$id"
+                tf install_list_available_fmt "$id" "$id"
             fi
         done
         echo
         echo "${MSG[install_usage]}"
         return
     fi
-    # Allow friendly aliases
-    case "$arg" in
-        adguard|agh|adblock) arg=adguardhome ;;
-        traffic|vnstat)      arg=traffic-stats ;;
-    esac
-    local url="${OPTIONAL_MODULES[$arg]}"
-    if [ -z "$url" ]; then
+
+    # Resolve alias → canonical id
+    local mod_id
+    mod_id=$(resolve_module_id "$arg")
+    if [ -z "$mod_id" ]; then
         tf install_unknown_fmt "$arg"
         return
     fi
-    if install_module_from_url "$arg" "$url"; then
+
+    local url
+    url=$(lookup_module_url "$mod_id")
+    if [ -z "$url" ]; then
+        tf install_no_url_fmt "$mod_id"
+        return
+    fi
+
+    if install_module_from_url "$mod_id" "$url"; then
         echo
         echo "${MSG[install_reboot_hint]}"
         echo "<<REBOOT_BUTTON>>"
@@ -936,12 +1001,7 @@ fmt_bytes() {
 cmd_traffic_history() {
     local arg=$(echo "$1" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
     if [ "$arg" = "install" ]; then
-        if install_module_from_url "traffic-stats" \
-                "${OPTIONAL_MODULES[traffic-stats]}"; then
-            echo
-            echo "${MSG[install_reboot_hint]}"
-            echo "<<REBOOT_BUTTON>>"
-        fi
+        cmd_install_module "traffic-stats"
         return
     fi
     local db=/data/traffic-stats
@@ -1012,12 +1072,7 @@ adguard_module_dir() {
 cmd_adguard() {
     local arg=$(echo "$1" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
     if [ "$arg" = "install" ]; then
-        if install_module_from_url "adguardhome" \
-                "${OPTIONAL_MODULES[adguardhome]}"; then
-            echo
-            echo "${MSG[install_reboot_hint]}"
-            echo "<<REBOOT_BUTTON>>"
-        fi
+        cmd_install_module "adguardhome"
         return
     fi
     local moddir
@@ -3685,7 +3740,8 @@ dispatch() {
         # ─── tailscale ─────────────────────────────────────────────────
         /tailscale|/ts)                reply=$(cmd_tailscale "$args") ;;
         /update|/güncelle|/guncelle)   reply=$(cmd_update "$args") ;;
-        /install|/kur|/yukle_modul)    reply=$(cmd_install "$args") ;;
+        /install_module|/installmodule|/install|/kur|/modul_kur|/modulkur)
+            reply=$(cmd_install_module "$args") ;;
         /lang|/dil|/language)          reply=$(cmd_lang "$args") ;;
         *)
             local lc=$(echo "$text" | tr '[:upper:]' '[:lower:]' | tr -d ' .,!?')
@@ -3748,7 +3804,7 @@ cpu_freq cpu_governor wakelock \
 freeze unfreeze installed \
 who last_boot bot_stats restart_bot \
 quiet_hours heartbeat alarm schedule \
-tailscale perf_balanced perf_help minimal_mode speedtest update install lang"
+tailscale perf_balanced perf_help minimal_mode speedtest update install_module lang"
 
 # JSON-escape a string for setMyCommands body (handles backslash + dquote)
 json_escape() {

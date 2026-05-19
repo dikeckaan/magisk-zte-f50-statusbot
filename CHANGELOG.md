@@ -1,5 +1,25 @@
 # Changelog
 
+## v2.14.0 — 2026-05-19
+- **Renamed** `/install` → `/install_module` (clearer when paired with
+  `/update`). Old `/install` and `/kur` aliases still work for now.
+- **Manifest-driven catalog**: The list of installable modules now comes
+  from `modules.json` in the
+  [f50-magisk-modules](https://github.com/dikeckaan/f50-magisk-modules)
+  aggregator repo, not from a hardcoded bash array. Adding a module to
+  the ecosystem = one PR to that file; the bot picks it up on its next
+  catalog refresh (10-min TTL cache at `/data/statusbot/.modules.json`).
+- **All optional modules now installable from Telegram**:
+  - `/install_module cloudflared-tunnel` (alias: tunnel, cf)
+  - `/install_module dropbear-ssh` (alias: ssh, dropbear)
+  - `/install_module wireless-adb-keeper` (alias: adb, wireless-adb)
+  - `/install_module tailscale-control` (alias: tailscale, ts)
+  - `/install_module adguardhome` (alias: adguard, agh, adblock)
+  - `/install_module traffic-stats` (alias: traffic, vnstat)
+- Friendly aliases are resolved from the manifest's `aliases[]` field.
+- `/adguard install` and `/traffic_history install` shortcuts now delegate
+  to `cmd_install_module` for consistency.
+
 ## v2.13.1 — 2026-05-19
 - **Inline Reboot button** after a module install or update succeeds.
   `/update`, `/update <id>`, `/install <id>`, `/adguard install`, and
