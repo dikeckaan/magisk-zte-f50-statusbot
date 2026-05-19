@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.15.6"
+BOT_VERSION="v2.16.0"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -3005,6 +3005,142 @@ cmd_cellinfo() {
     [ -n "$iccid_clean" ] && echo "ICCID: $iccid_clean"
 }
 
+# ─── cell-tools integration: /spectrum, /imsi_watch, /locate ──────────────
+CELL_DB=/data/cell-tools/db/cells.json
+CELL_EVENTS=/data/cell-tools/db/events.log
+
+cell_tools_present() {
+    [ -d /data/adb/modules/cell-tools ] || [ -d /data/adb/modules_update/cell-tools ]
+}
+
+cmd_spectrum() {
+    if ! cell_tools_present; then
+        say "${MSG[cell_not_installed]}"
+        return
+    fi
+    if [ ! -r "$CELL_DB" ]; then
+        say "${MSG[cell_db_empty]}"
+        return
+    fi
+    say "${MSG[spectrum_header]}"
+    "$JQ" -r '
+        to_entries
+        | sort_by(-.value.last_seen)
+        | .[]
+        | "  cell \(.value.cell_id_dec) (TAC \(.value.tac_hex))  "
+          + "\(.value.act_label)  RSRP \(.value.rsrp_dbm)dBm  RSRQ \(.value.rsrq_db)dB  EARFCN \(.value.earfcn)"
+          + "  seen=\(.value.count)x"
+    ' "$CELL_DB" 2>/dev/null | head -20
+}
+
+cmd_imsi_watch() {
+    if ! cell_tools_present; then
+        say "${MSG[cell_not_installed]}"
+        return
+    fi
+    local sub=$(first_word "$1" | tr '[:upper:]' '[:lower:]')
+    case "$sub" in
+        ""|status)
+            local n=$("$JQ" 'keys | length' "$CELL_DB" 2>/dev/null)
+            local events=$(wc -l < "$CELL_EVENTS" 2>/dev/null || echo 0)
+            tf imsi_watch_status_fmt "${n:-0}" "${events:-0}"
+            ;;
+        list)
+            say "${MSG[imsi_watch_list_header]}"
+            "$JQ" -r 'to_entries | .[] | "  \(.value.cell_id_dec)  MCC=\(.value.mcc) MNC=\(.value.mnc) TAC=\(.value.tac_hex) seen=\(.value.count)x"' "$CELL_DB" 2>/dev/null | head -30
+            ;;
+        alerts)
+            say "${MSG[imsi_watch_alerts_header]}"
+            [ -r "$CELL_EVENTS" ] && tail -20 "$CELL_EVENTS" || echo "${MSG[imsi_watch_no_events]}"
+            ;;
+        *)
+            say "${MSG[imsi_watch_usage]}"
+            ;;
+    esac
+}
+
+cmd_locate() {
+    if ! cell_tools_present; then
+        say "${MSG[cell_not_installed]}"
+        return
+    fi
+    if [ ! -r "$CELL_DB" ]; then
+        say "${MSG[cell_db_empty]}"
+        return
+    fi
+    # Pull the most recently seen cell as the geolocation seed.
+    local rec
+    rec=$("$JQ" -r 'to_entries | sort_by(-.value.last_seen) | .[0].value' "$CELL_DB" 2>/dev/null)
+    if [ -z "$rec" ] || [ "$rec" = "null" ]; then
+        say "${MSG[locate_no_data]}"
+        return
+    fi
+
+    local mcc mnc cellid tac rsrp_dbm
+    mcc=$(echo "$rec"     | "$JQ" -r '.mcc')
+    mnc=$(echo "$rec"     | "$JQ" -r '.mnc')
+    cellid=$(echo "$rec"  | "$JQ" -r '.cell_id_dec')
+    tac=$(echo "$rec"     | "$JQ" -r '.tac_dec')
+    rsrp_dbm=$(echo "$rec" | "$JQ" -r '.rsrp_dbm')
+
+    tf locate_request_fmt "$mcc" "$mnc" "$cellid"
+
+    # Mozilla Location Service — anonymous endpoint, no key.
+    local body
+    body=$("$JQ" -nc \
+        --argjson mcc "$mcc" --argjson mnc "$mnc" \
+        --argjson cid "$cellid" --argjson tac "$tac" \
+        --argjson rsrp "$rsrp_dbm" \
+        '{cellTowers:[{radioType:"lte", mobileCountryCode:$mcc, mobileNetworkCode:$mnc, cellId:$cid, locationAreaCode:$tac, signalStrength:$rsrp}], considerIp:false}')
+
+    local resp
+    resp=$("$CURL" -sS --cacert "$CA" --max-time 15 \
+        -H "Content-Type: application/json" \
+        --data "$body" \
+        "https://location.services.mozilla.com/v1/geolocate?key=test" 2>/dev/null)
+
+    local lat lng acc
+    lat=$(echo "$resp" | "$JQ" -r '.location.lat // empty' 2>/dev/null)
+    lng=$(echo "$resp" | "$JQ" -r '.location.lng // empty' 2>/dev/null)
+    acc=$(echo "$resp" | "$JQ" -r '.accuracy // empty' 2>/dev/null)
+
+    if [ -z "$lat" ] || [ -z "$lng" ]; then
+        local err
+        err=$(echo "$resp" | "$JQ" -r '.error.message // .' 2>/dev/null | head -c 200)
+        tf locate_failed_fmt "$err"
+        return
+    fi
+    tf locate_result_fmt "$lat" "$lng" "${acc:-?}" "$lat" "$lng"
+}
+
+# ─── /ussd — run a USSD shortcode via AT+CUSD ──────────────────────────────
+cmd_ussd() {
+    if [ ! -x "$SENDAT" ]; then
+        say "${MSG[no_sendat_short]}"
+        return
+    fi
+    local code=$(first_word "$1")
+    if [ -z "$code" ]; then
+        say "${MSG[ussd_usage]}"
+        return
+    fi
+    tf ussd_request_fmt "$code"
+    # AT+CUSD=1,"<code>",15  (15 = GSM 7-bit default alphabet)
+    local resp
+    resp=$(at_cmd "AT+CUSD=1,\"$code\",15")
+    # Sample +CUSD: 0,"Balance is 12.34 TRY",17
+    local m1 m2
+    m1=$(echo "$resp" | sed -n 's/.*+CUSD: *0,"\([^"]*\)".*/\1/p')
+    m2=$(echo "$resp" | sed -n 's/.*+CUSD: *1,"\([^"]*\)".*/\1/p')
+    if [ -n "$m1" ]; then
+        tf ussd_response_fmt "$m1"
+    elif [ -n "$m2" ]; then
+        tf ussd_multistep_fmt "$m2"
+    else
+        tf ussd_failed_fmt "$(echo "$resp" | head -c 300)"
+    fi
+}
+
 cmd_ip() {
     echo "🌐 Public IP:"
     echo "  $(fmt_public_ip)"
@@ -3793,6 +3929,10 @@ dispatch() {
         /traffic_history|/traffichistory|/trafic_history|/vnstat)
             reply=$(cmd_traffic_history "$(first_word "$args")") ;;
         /adguard|/agh|/adblock)        reply=$(cmd_adguard "$args") ;;
+        /spectrum|/cells)              reply=$(cmd_spectrum) ;;
+        /imsi_watch|/imsiwatch|/imsi)  reply=$(cmd_imsi_watch "$args") ;;
+        /locate|/where|/konum)         reply=$(cmd_locate) ;;
+        /ussd|/shortcode)              reply=$(cmd_ussd "$args") ;;
         # ─── power / kernel ────────────────────────────────────────────
         /cpu_freq|/cpufreq|/freq)      reply=$(cmd_cpu_freq) ;;
         /cpu_governor|/governor|/gov)  reply=$(cmd_cpu_governor "$args") ;;
@@ -3879,7 +4019,7 @@ sms_list sms_count sms_send wifi \
 file screenshot ramclean at modules \
 performance zte_setpw komut reboot version iptal \
 ls cat df du log dump_sms upload \
-connections listening dhcp dns traffic_history adguard \
+connections listening dhcp dns traffic_history adguard spectrum imsi_watch locate ussd \
 cpu_freq cpu_governor wakelock \
 freeze unfreeze installed \
 who last_boot bot_stats restart_bot \

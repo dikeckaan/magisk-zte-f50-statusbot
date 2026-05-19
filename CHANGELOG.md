@@ -1,5 +1,27 @@
 # Changelog
 
+## v2.16.0 — 2026-05-19
+- **cell-tools integration** — 4 new commands powered by the new
+  [cell-tools](https://github.com/dikeckaan/magisk-zte-f50-cell-tools)
+  Magisk module (Phase 1 of the "cep çakısı" plan):
+  - `/spectrum` — table of visible cell towers (cell_id, TAC, RSRP,
+    RSRQ, AcT, EARFCN). Reads from cell-tools' cells.json DB.
+  - `/imsi_watch {status|list|alerts}` — IMSI-catcher anomaly
+    monitoring. Reports counts, lists known cells, shows recent
+    anomaly events (new cell + high RSRP, sudden RSRP jump).
+  - `/locate` — GPS via cell-tower triangulation. Pulls the most
+    recently seen cell from cell-tools, POSTs to Mozilla Location
+    Service (anonymous, no key needed), returns lat/lng + accuracy +
+    Google Maps link. F50 has no GPS, this fills the gap.
+  - `/ussd <code>` — execute USSD shortcodes via `AT+CUSD=1,"<code>",15`
+    and parse the `+CUSD:` response. Single-step and multi-step both
+    supported. Useful for prepaid balance / package activation.
+- 21 new MSG keys in en.sh + tr.sh.
+- If cell-tools isn't installed, each command politely points the user
+  at `/install_module cell-tools` instead of crashing.
+- Verified on hardware — cell-tools running, Vodafone TR cell 8504146
+  decoded correctly, parser stable.
+
 ## v2.15.6 — 2026-05-19
 - **Fixed**: lang strings written with literal `\n` (e.g.
   `[install_usage]="Usage:\n  /install_module <id>..."`) rendered as
