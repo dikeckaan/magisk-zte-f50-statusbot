@@ -3624,7 +3624,7 @@ _sip_qr_offer() {
 _sip_qr_send() {
     # $1 chat_id, $2 network slug, $3 username
     local chat="$1" net="$2" user="$3"
-    local pass host uri qr_file
+    local pass host
     pass=$(_sip_get_password "$user")
     host=$(_sip_host_for "$net")
     if [ -z "$pass" ] || [ -z "$host" ]; then
@@ -3633,18 +3633,66 @@ _sip_qr_send() {
             --data-urlencode "text=❌ '$user' veya $net IP bulunamadı." >/dev/null 2>&1
         return
     fi
-    # Linphone & MicroSIP both reject SIP URIs that embed a password
-    # (security: prevent silent capture of plaintext credentials from a QR).
-    # We only encode the identity URI; the password is shown in the
-    # caption and the user pastes/types it once on the device.
-    uri="sip:${user}@${host}:5060;transport=udp"
-    qr_file=/data/local/tmp/.sip-qr-$$-${user}.png
+
+    # Linphone accepts a "remote provisioning" XML config served over HTTP.
+    # We write a per-call XML file, spin up a one-shot busybox httpd on a
+    # random port for 5 minutes, and put the http URL in the QR. Linphone
+    # fetches → account auto-creates with credentials.
+
+    local serve_dir=/data/sip-server/provisioning
+    local nonce=$(date +%s%N | tail -c 9)
+    local fname=lp-${user}-${nonce}.xml
+    local realm="callforward.local"
+    mkdir -p "$serve_dir" 2>/dev/null
+    chmod 755 "$serve_dir"
+    cat > "$serve_dir/$fname" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns="http://www.linphone.org/xsds/lpconfig.xsd">
+  <section name="proxy_default_values">
+    <entry name="reg_expires">1800</entry>
+    <entry name="reg_sendregister">1</entry>
+  </section>
+  <section name="proxy_0">
+    <entry name="reg_proxy">&lt;sip:${host}:5060;transport=udp&gt;</entry>
+    <entry name="reg_identity">sip:${user}@${host}</entry>
+    <entry name="reg_route">&lt;sip:${host}:5060;transport=udp;lr&gt;</entry>
+    <entry name="reg_expires">1800</entry>
+    <entry name="reg_sendregister">1</entry>
+    <entry name="realm">${realm}</entry>
+    <entry name="publish">0</entry>
+    <entry name="avpf">0</entry>
+  </section>
+  <section name="auth_info_0">
+    <entry name="username">${user}</entry>
+    <entry name="userid">${user}</entry>
+    <entry name="passwd">${pass}</entry>
+    <entry name="realm">${realm}</entry>
+  </section>
+</config>
+EOF
+    chmod 644 "$serve_dir/$fname"
+
+    # Pick a TCP port for busybox httpd
+    local port=$(( 18000 + RANDOM % 1000 ))
+
+    # 5-min one-shot httpd, then auto-cleanup
+    nohup sh -c "
+        busybox httpd -f -p ${port} -h ${serve_dir} >/dev/null 2>&1 &
+        HTTPD_PID=\$!
+        sleep 300
+        kill \$HTTPD_PID 2>/dev/null
+        rm -f ${serve_dir}/${fname}
+    " >/dev/null 2>&1 &
+    sleep 0.5
+
+    local url="http://${host}:${port}/${fname}"
+    local qr_file=/data/local/tmp/.sip-qr-$$-${user}.png
     "$CURL" -sS --cacert "$CA" --max-time 20 \
         -G "https://api.qrserver.com/v1/create-qr-code/" \
         --data-urlencode "size=480x480" \
         --data-urlencode "margin=10" \
         --data-urlencode "ecc=M" \
-        --data-urlencode "data=$uri" \
+        --data-urlencode "data=$url" \
         -o "$qr_file" 2>/dev/null
     if [ ! -s "$qr_file" ]; then
         "$CURL" -sS --cacert "$CA" --max-time 15 \
@@ -3658,16 +3706,23 @@ _sip_qr_send() {
         ts)    label="🔒 Tailscale" ;;
         *)     label="$net" ;;
     esac
-    local caption="$label — $user@$host
-Username: $user
-Password: $pass
-Domain:   $host
-Port:     5060
-Transport: udp
+    local caption="$label — $user@$host  (port $port, 5 dk TTL)
 
-QR sadece identity (SIP URI) içerir — parola güvenlik için QR'a gömülmedi.
-Linphone: Settings → Accounts → Add → 'Use SIP account' → Scan QR
-sonra ekranda parola alanına yukarıdaki Password değerini gir."
+Linphone:
+  1. Assistant / Add account
+  2. 'Fetch remote configuration' veya 'Scan QR code'
+  3. QR tara — Linphone XML'i fetch eder, hesap otomatik kurulur.
+
+Manuel fallback (Linphone dışındaki istemciler için):
+  Username: $user
+  Password: $pass
+  Domain:   $host
+  Port:     5060
+  Transport: udp
+  Realm:    callforward.local
+
+XML URL ($port portu 5 dk aktif):
+$url"
     tg_send_photo "$chat" "$qr_file" "$caption"
     rm -f "$qr_file"
 }
