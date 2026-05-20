@@ -3634,7 +3634,7 @@ _sip_qr_send() {
         return
     fi
     uri="sip:${user}:${pass}@${host}:5060;transport=udp"
-    qr_file=/tmp/.sip-qr-$$-${user}.png
+    qr_file=/data/local/tmp/.sip-qr-$$-${user}.png
     "$CURL" -sS --cacert "$CA" --max-time 20 \
         -G "https://api.qrserver.com/v1/create-qr-code/" \
         --data-urlencode "size=480x480" \
