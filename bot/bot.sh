@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.21.0"
+BOT_VERSION="v2.21.1"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -3552,6 +3552,32 @@ sip_server_present() {
     [ -d /data/adb/modules/sip-server ] || [ -d /data/adb/modules_update/sip-server ]
 }
 
+_sip_user_exists() {
+    local user=$1
+    awk -F: -v u="$user" '/^[^#]/ && $1==u {f=1} END{exit !f}' "$SIP_USERS_CONF" 2>/dev/null
+}
+
+_sip_valid_user() {
+    # only [A-Za-z0-9_.-], 2..32 chars
+    case "$1" in
+        ""|*[!A-Za-z0-9_.-]*) return 1 ;;
+    esac
+    [ "${#1}" -ge 2 ] && [ "${#1}" -le 32 ]
+}
+
+_sip_valid_pass() {
+    # no colons (delimiter), no whitespace, 6..64 chars
+    case "$1" in
+        *:*|*' '*|*$'\t'*|*$'\n'*) return 1 ;;
+    esac
+    [ "${#1}" -ge 6 ] && [ "${#1}" -le 64 ]
+}
+
+_sip_reload() {
+    pkill -f /system/bin/sipserver 2>/dev/null
+    pkill -f /data/adb/modules/sip-server 2>/dev/null
+}
+
 cmd_sip() {
     if ! sip_server_present; then
         echo "❌ sip-server modülü kurulu değil. /install_module sip-server"
@@ -3612,13 +3638,103 @@ cmd_sip() {
             ;;
         restart)
             echo "♻️ sipserver yeniden başlatılıyor..."
-            pkill -f /system/bin/sipserver 2>/dev/null
-            pkill -f /data/adb/modules/sip-server 2>/dev/null
+            _sip_reload
             sleep 1
             echo "  service.sh supervisor 10 sn içinde yeniden başlatır."
             ;;
+        register|add)
+            local user=$(nth_word 2 "$1")
+            local pass=$(nth_word 3 "$1")
+            if ! _sip_valid_user "$user"; then
+                echo "❌ Geçersiz kullanıcı adı. Kural: 2-32 karakter, sadece [A-Za-z0-9_.-]."
+                echo "Usage: /sip register <username> <password>"
+                return
+            fi
+            if ! _sip_valid_pass "$pass"; then
+                echo "❌ Geçersiz parola. Kural: 6-64 karakter, ':', boşluk, tab, newline yasak."
+                echo "Usage: /sip register <username> <password>"
+                return
+            fi
+            if _sip_user_exists "$user"; then
+                echo "⚠️ Kullanıcı '$user' zaten var. Şifre değiştirmek için: /sip passwd $user <newpw>"
+                return
+            fi
+            printf '%s:%s\n' "$user" "$pass" >> "$SIP_USERS_CONF"
+            chmod 600 "$SIP_USERS_CONF"
+            _sip_reload
+            echo "✅ '$user' eklendi (parola gizli)."
+            echo "♻️ sipserver yeniden yükleniyor (10 sn içinde aktif)."
+            ;;
+        remove|del|delete)
+            local user=$(nth_word 2 "$1")
+            if ! _sip_valid_user "$user"; then
+                echo "Usage: /sip remove <username>"
+                return
+            fi
+            if [ "$user" = "server" ]; then
+                echo "🚫 'server' silinemez — F50SipBridge bu slot'a register oluyor."
+                return
+            fi
+            if ! _sip_user_exists "$user"; then
+                echo "❌ Kullanıcı '$user' yok."
+                return
+            fi
+            # use awk to filter out — sed is finicky with /
+            awk -F: -v u="$user" 'BEGIN{OFS=":"} /^#/ {print; next} $1==u {next} {print}' \
+                "$SIP_USERS_CONF" > "$SIP_USERS_CONF.tmp" \
+                && mv "$SIP_USERS_CONF.tmp" "$SIP_USERS_CONF"
+            chmod 600 "$SIP_USERS_CONF"
+            _sip_reload
+            echo "✅ '$user' silindi."
+            echo "♻️ sipserver yeniden yükleniyor."
+            ;;
+        passwd|password|pw)
+            local user=$(nth_word 2 "$1")
+            local pass=$(nth_word 3 "$1")
+            if ! _sip_valid_user "$user" || ! _sip_valid_pass "$pass"; then
+                echo "Usage: /sip passwd <username> <new-password>"
+                return
+            fi
+            if ! _sip_user_exists "$user"; then
+                echo "❌ Kullanıcı '$user' yok. /sip register $user <pw>"
+                return
+            fi
+            awk -F: -v u="$user" -v p="$pass" 'BEGIN{OFS=":"}
+                /^#/ {print; next}
+                $1==u {print u, p; next}
+                {print}' "$SIP_USERS_CONF" > "$SIP_USERS_CONF.tmp" \
+                && mv "$SIP_USERS_CONF.tmp" "$SIP_USERS_CONF"
+            chmod 600 "$SIP_USERS_CONF"
+            _sip_reload
+            echo "✅ '$user' parolası güncellendi."
+            echo "♻️ sipserver yeniden yükleniyor."
+            ;;
+        whoami|show)
+            local user=$(nth_word 2 "$1")
+            if ! _sip_valid_user "$user"; then
+                echo "Usage: /sip show <username>"
+                return
+            fi
+            if ! _sip_user_exists "$user"; then
+                echo "❌ Kullanıcı '$user' yok."
+                return
+            fi
+            # Tek satırı çıkar — parola dahil (sadece sahibe görünür chat)
+            echo "🔐 Hesap '$user':"
+            echo '```'
+            awk -F: -v u="$user" '$1==u {print "username = "$1"\npassword = "$2"\ndomain   = '"$(getprop net.hostname 2>/dev/null || echo F50)"'\nport     = 5060\ntransport= udp"}' "$SIP_USERS_CONF"
+            echo '```'
+            ;;
         *)
-            echo "Usage: /sip [status|log|users|restart]"
+            echo "Usage:"
+            echo "  /sip                          — durum"
+            echo "  /sip log                      — daemon log (son 20 satır)"
+            echo "  /sip users                    — kullanıcı listesi"
+            echo "  /sip register <user> <pw>     — yeni hesap"
+            echo "  /sip remove <user>            — hesap sil"
+            echo "  /sip passwd <user> <newpw>    — parola değiştir"
+            echo "  /sip show <user>              — Linphone/MicroSIP için ayar bilgisi"
+            echo "  /sip restart                  — sipserver'ı yeniden başlat"
             ;;
     esac
 }

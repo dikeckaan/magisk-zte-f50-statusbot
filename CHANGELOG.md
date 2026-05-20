@@ -1,5 +1,20 @@
 # Changelog
 
+## v2.21.1 — 2026-05-20
+- **`/sip` gains account management** — SIP user CRUD without editing
+  the conf file by hand:
+  - `/sip register <user> <pw>` — add a new SIP account
+  - `/sip remove <user>` — delete one (refuses to remove `server`,
+    which is the slot the on-device F50SipBridge registers into)
+  - `/sip passwd <user> <newpw>` — change password
+  - `/sip show <user>` — print Linphone/MicroSIP-style settings block
+    (domain, port, transport, username + password) for the chat owner
+  - Each mutation reloads sipserver via `pkill` so the supervisor
+    relaunches with the new conf in ~10 s
+- Username/password validation: username `[A-Za-z0-9_.-]{2,32}`,
+  password 6-64 chars without `:` or whitespace (since `:` is the
+  on-disk delimiter)
+
 ## v2.21.0 — 2026-05-19
 - **`/sip`** — status surface for the new `sip-server` module + the
   `com.f50.sip` F50SipBridge Android app (Phase 8). Subcommands:
