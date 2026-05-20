@@ -3633,7 +3633,11 @@ _sip_qr_send() {
             --data-urlencode "text=❌ '$user' veya $net IP bulunamadı." >/dev/null 2>&1
         return
     fi
-    uri="sip:${user}:${pass}@${host}:5060;transport=udp"
+    # Linphone & MicroSIP both reject SIP URIs that embed a password
+    # (security: prevent silent capture of plaintext credentials from a QR).
+    # We only encode the identity URI; the password is shown in the
+    # caption and the user pastes/types it once on the device.
+    uri="sip:${user}@${host}:5060;transport=udp"
     qr_file=/data/local/tmp/.sip-qr-$$-${user}.png
     "$CURL" -sS --cacert "$CA" --max-time 20 \
         -G "https://api.qrserver.com/v1/create-qr-code/" \
@@ -3661,7 +3665,9 @@ Domain:   $host
 Port:     5060
 Transport: udp
 
-Linphone: Settings → Add account → Scan QR"
+QR sadece identity (SIP URI) içerir — parola güvenlik için QR'a gömülmedi.
+Linphone: Settings → Accounts → Add → 'Use SIP account' → Scan QR
+sonra ekranda parola alanına yukarıdaki Password değerini gir."
     tg_send_photo "$chat" "$qr_file" "$caption"
     rm -f "$qr_file"
 }
