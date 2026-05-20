@@ -1760,6 +1760,7 @@ TS_STATE="$TS_DIR/tailscaled.state"
 TS_LOG="$TS_DIR/tailscaled.log"
 TS_PID="$TS_DIR/tailscaled.pid"
 TS_AUTHKEY="$TS_DIR/authkey"
+TS_AUTOSTART="$TS_DIR/autostart"   # empty marker — present = boot-start enabled
 
 ts_is_running() {
     [ -f "$TS_PID" ] || return 1
@@ -1874,6 +1875,9 @@ cmd_tailscale() {
             ts_ip=$(ts_cli ip -4 2>/dev/null | head -1)
             if [ -n "$ts_ip" ]; then
                 log "tailscale on: ip=$ts_ip"
+                # Persist the "wants to be on" intent across reboot.
+                # tailscale-control's service.sh checks this file at boot.
+                touch "$TS_AUTOSTART" 2>/dev/null
                 tf ts_active_fmt "$ts_ip"
             else
                 # Login URL fallback (no authkey or new node)
@@ -1900,7 +1904,9 @@ cmd_tailscale() {
             ts_is_running && kill -9 "$(cat "$TS_PID")" 2>/dev/null
             rm -f "$TS_PID"
             ts_del_iptables
-            log "tailscale off"
+            # Clear the boot-autostart flag so reboot does not re-enable it.
+            rm -f "$TS_AUTOSTART"
+            log "tailscale off (autostart disabled)"
             say "${MSG[ts_stopped]}"
             ;;
         auth)
@@ -1925,8 +1931,8 @@ cmd_tailscale() {
                 [ -n "$pid" ] && kill "$pid" 2>/dev/null
             fi
             ts_del_iptables
-            rm -f "$TS_STATE" "$TS_PID" "$TS_AUTHKEY"
-            log "tailscale logout + state wiped"
+            rm -f "$TS_STATE" "$TS_PID" "$TS_AUTHKEY" "$TS_AUTOSTART"
+            log "tailscale logout + state wiped + autostart cleared"
             say "${MSG[ts_logout_done]}"
             ;;
         ip)
