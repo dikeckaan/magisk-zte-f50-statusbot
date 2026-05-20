@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.21.2 — 2026-05-20
+- **`/sip qr <user>`** — Linphone / MicroSIP / Acrobits için
+  taranabilir QR. Komut çağrıldığında bot inline keyboard çıkarır
+  ("📡 Local LAN (br0)" / "🔒 Tailscale (100.x.x.x)") — Tailscale
+  arayüzü ayakta değilse o buton görünmez. Tıklayınca:
+  1. `sip_users.conf`'tan parola okunur
+  2. SIP URI kurulur: `sip:user:pass@host:5060;transport=udp`
+  3. `api.qrserver.com/v1/create-qr-code/` üzerinden 480×480 PNG çekilir
+  4. `sendPhoto` ile chat'e yollanır, caption'da username/password/
+     domain/port/transport bloğu + Linphone import talimatı
+- Callback handler `sipqr:<net>:<user>` formatını işliyor — başka bir
+  şey kaldırılmadı, mevcut `cancel:*` / `reboot_now` callback'leri
+  aynen kalıyor.
+
 ## v2.21.1 — 2026-05-20
 - **`/sip` gains account management** — SIP user CRUD without editing
   the conf file by hand:

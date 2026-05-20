@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.21.1"
+BOT_VERSION="v2.21.2"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -3578,6 +3578,94 @@ _sip_reload() {
     pkill -f /data/adb/modules/sip-server 2>/dev/null
 }
 
+_sip_get_password() {
+    awk -F: -v u="$1" '/^[^#]/ && $1==u {print $2; exit}' "$SIP_USERS_CONF" 2>/dev/null
+}
+
+_sip_host_for() {
+    # $1 = network slug (local|ts)  →  prints chosen IP, empty if not available
+    case "$1" in
+        local)
+            ip -4 addr show br0 2>/dev/null | awk '/inet /{sub("/.*","",$2);print $2;exit}'
+            ;;
+        ts)
+            ip -4 addr show tailscale0 2>/dev/null | awk '/inet /{sub("/.*","",$2);print $2;exit}'
+            ;;
+    esac
+}
+
+_sip_qr_offer() {
+    # $1 chat_id, $2 user — sends an inline keyboard with available networks
+    local user="$2" buttons=""
+    local lan_ip ts_ip
+    lan_ip=$(_sip_host_for local)
+    ts_ip=$(_sip_host_for ts)
+    if [ -n "$lan_ip" ]; then
+        buttons="$buttons,{\"text\":\"📡 Local LAN ($lan_ip)\",\"callback_data\":\"sipqr:local:$user\"}"
+    fi
+    if [ -n "$ts_ip" ]; then
+        buttons="$buttons,{\"text\":\"🔒 Tailscale ($ts_ip)\",\"callback_data\":\"sipqr:ts:$user\"}"
+    fi
+    buttons="${buttons#,}"
+    if [ -z "$buttons" ]; then
+        echo "❌ Ne br0 ne de tailscale0 IP'si bulundu. Network up değil."
+        return
+    fi
+    local kb="{\"inline_keyboard\":[[$buttons]]}"
+    local text="🔗 '$user' için QR — hangi ağdan ulaşılacak?"
+    "$CURL" -sS --cacert "$CA" --max-time 15 \
+        "${TG_API}${TOKEN}/sendMessage" \
+        -d "chat_id=$1" \
+        --data-urlencode "text=$text" \
+        --data-urlencode "reply_markup=$kb" \
+        >/dev/null 2>&1
+}
+
+_sip_qr_send() {
+    # $1 chat_id, $2 network slug, $3 username
+    local chat="$1" net="$2" user="$3"
+    local pass host uri qr_file
+    pass=$(_sip_get_password "$user")
+    host=$(_sip_host_for "$net")
+    if [ -z "$pass" ] || [ -z "$host" ]; then
+        "$CURL" -sS --cacert "$CA" --max-time 15 \
+            "${TG_API}${TOKEN}/sendMessage" -d "chat_id=$chat" \
+            --data-urlencode "text=❌ '$user' veya $net IP bulunamadı." >/dev/null 2>&1
+        return
+    fi
+    uri="sip:${user}:${pass}@${host}:5060;transport=udp"
+    qr_file=/tmp/.sip-qr-$$-${user}.png
+    "$CURL" -sS --cacert "$CA" --max-time 20 \
+        -G "https://api.qrserver.com/v1/create-qr-code/" \
+        --data-urlencode "size=480x480" \
+        --data-urlencode "margin=10" \
+        --data-urlencode "ecc=M" \
+        --data-urlencode "data=$uri" \
+        -o "$qr_file" 2>/dev/null
+    if [ ! -s "$qr_file" ]; then
+        "$CURL" -sS --cacert "$CA" --max-time 15 \
+            "${TG_API}${TOKEN}/sendMessage" -d "chat_id=$chat" \
+            --data-urlencode "text=❌ QR API erişimi başarısız." >/dev/null 2>&1
+        return
+    fi
+    local label
+    case "$net" in
+        local) label="📡 Local LAN" ;;
+        ts)    label="🔒 Tailscale" ;;
+        *)     label="$net" ;;
+    esac
+    local caption="$label — $user@$host
+Username: $user
+Password: $pass
+Domain:   $host
+Port:     5060
+Transport: udp
+
+Linphone: Settings → Add account → Scan QR"
+    tg_send_photo "$chat" "$qr_file" "$caption"
+    rm -f "$qr_file"
+}
+
 cmd_sip() {
     if ! sip_server_present; then
         echo "❌ sip-server modülü kurulu değil. /install_module sip-server"
@@ -3725,6 +3813,19 @@ cmd_sip() {
             awk -F: -v u="$user" '$1==u {print "username = "$1"\npassword = "$2"\ndomain   = '"$(getprop net.hostname 2>/dev/null || echo F50)"'\nport     = 5060\ntransport= udp"}' "$SIP_USERS_CONF"
             echo '```'
             ;;
+        qr)
+            local user=$(nth_word 2 "$1")
+            if ! _sip_valid_user "$user"; then
+                echo "Usage: /sip qr <username>"
+                return
+            fi
+            if ! _sip_user_exists "$user"; then
+                echo "❌ Kullanıcı '$user' yok. Önce: /sip register $user <pw>"
+                return
+            fi
+            # Inline keyboard via tg_send_message directly; no captured echo.
+            _sip_qr_offer "$chat_id" "$user"
+            ;;
         *)
             echo "Usage:"
             echo "  /sip                          — durum"
@@ -3733,7 +3834,8 @@ cmd_sip() {
             echo "  /sip register <user> <pw>     — yeni hesap"
             echo "  /sip remove <user>            — hesap sil"
             echo "  /sip passwd <user> <newpw>    — parola değiştir"
-            echo "  /sip show <user>              — Linphone/MicroSIP için ayar bilgisi"
+            echo "  /sip show <user>              — Linphone/MicroSIP için ayar bilgisi (text)"
+            echo "  /sip qr <user>                — QR (ağ seçimi sorulur: Local LAN / Tailscale)"
             echo "  /sip restart                  — sipserver'ı yeniden başlat"
             ;;
     esac
@@ -4369,6 +4471,15 @@ handle_callback() {
             ( sleep 2; /system/bin/reboot ) &
             return
             ;;
+        sipqr:*)
+            # sipqr:<net>:<user>
+            tg_answer_callback "$cb_id" "Hazırlanıyor..."
+            local rest="${data#sipqr:}"
+            local net="${rest%%:*}"
+            local user="${rest#*:}"
+            _sip_qr_send "$from_chat" "$net" "$user"
+            return
+            ;;
         cancel:*)
             local task_id="${data#cancel:}"
             local metafile="$TASK_DIR/${task_id}.meta"
@@ -4524,7 +4635,14 @@ dispatch() {
         /locate|/where|/konum)         reply=$(cmd_locate) ;;
         /ussd|/shortcode)              reply=$(cmd_ussd "$args") ;;
         /sms_cmd|/smscmd)              reply=$(cmd_sms_cmd "$args") ;;
-        /sip|/voip)                    reply=$(cmd_sip "$args") ;;
+        /sip|/voip)
+            local sub=$(first_word "$args" | tr '[:upper:]' '[:lower:]')
+            if [ "$sub" = "qr" ]; then
+                # qr sub-command sends an inline keyboard directly, no captured output
+                cmd_sip "$args"
+                return
+            fi
+            reply=$(cmd_sip "$args") ;;
         /tor)                          reply=$(cmd_tor "$args") ;;
         /dns_watch|/dnswatch|/dns)     reply=$(cmd_dns_watch "$args") ;;
         /mitm)
