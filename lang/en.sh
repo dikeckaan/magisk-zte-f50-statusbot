@@ -127,6 +127,38 @@ Type /help for commands."
 /tailscale status — state + RAM
 /tailscale ip / peers / log / logout
 
+📞 SIP / VoIP (sip-server module)
+/sip                       — sipserver state, listed users, active registrations
+/sip log                   — last 20 lines of /data/sip-server/daemon.log
+/sip users                 — declared usernames
+/sip register <u> <pw>     — add a SIP account (6+ char password, no ':' or space)
+/sip remove <u>            — delete an account ('server' is protected)
+/sip passwd <u> <newpw>    — change password
+/sip show <u>              — text settings block (username, password, domain, port)
+/sip qr <u>                — Linphone XML provisioning over a one-shot HTTP
+                             (5 min TTL); inline keyboard picks Local LAN
+                             vs Tailscale endpoint. Note: Linphone 6.0+ may
+                             reject plain-HTTP QR — use manual setup with
+                             the values from /sip show if so.
+/sip restart               — kill sipserver; supervisor relaunches in 10 s
+
+Quick setup on any SIP client (Linphone, Zoiper, MicroSIP, …):
+  Username:  <u>           (from /sip users)
+  Password:  <pw>          (the one you set via /sip register/passwd)
+  Domain:    192.168.0.1   (when on the F50's WiFi)
+             100.x.x.x     (when on Tailscale — get it from /tailscale ip)
+  Transport: UDP
+  Port:      5060
+  Realm:     callforward.local  (most clients auto-detect this)
+
+GSM outbound notes:
+• Dialing a phone number like +905079... from a SIP client requires the
+  on-device F50SipBridge app (com.f50.sip) to be registered as 'server'
+  — without it, sipserver returns 'User not found' because there is no
+  registered handler for non-SIP-user destinations.
+• Check 'F50SipBridge app' line in /sip — if it isn't running, start it:
+  am start-foreground-service com.f50.sip/.SipForegroundService
+
 🔔 Automatic (background):
 • Incoming SMS forwarded to you
 • Alerts when temp > %d°C, RAM < %d%%, tunnel down

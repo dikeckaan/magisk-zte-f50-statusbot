@@ -117,6 +117,37 @@ Komutlar için /help"
 /tailscale status — durum + RAM
 /tailscale ip / peers / log / logout
 
+📞 SIP / VoIP (sip-server modülü)
+/sip                       — sipserver durumu, kullanıcı listesi, aktif register'lar
+/sip log                   — daemon.log son 20 satır
+/sip users                 — tanımlı kullanıcılar
+/sip register <u> <pw>     — yeni SIP hesabı (parola 6+ karakter, ':' ve boşluk yok)
+/sip remove <u>            — hesap sil ('server' silinemez)
+/sip passwd <u> <newpw>    — parola değiştir
+/sip show <u>              — ayar bloğu metni (kullanıcı, parola, domain, port)
+/sip qr <u>                — Linphone XML provisioning, 5 dk geçerli tek-seferlik
+                             HTTP; inline kbd ile 'Local LAN' veya 'Tailscale'
+                             seç. Not: Linphone 6.0+ plain-HTTP QR'ı reddedebilir;
+                             öyleyse /sip show çıktısıyla manuel kur.
+/sip restart               — sipserver'ı yeniden başlat (10 sn içinde)
+
+Herhangi bir SIP istemcide (Linphone, Zoiper, MicroSIP, …) hızlı kurulum:
+  Username:  <u>           (/sip users ile listede gör)
+  Password:  <pw>          (/sip register / /sip passwd ile koyduğun)
+  Domain:    192.168.0.1   (F50'nin WiFi'sindeyken)
+             100.x.x.x     (Tailscale'deyken — /tailscale ip ile öğren)
+  Transport: UDP
+  Port:      5060
+  Realm:     callforward.local  (çoğu istemci otomatik algılar)
+
+GSM çıkışlı arama notları:
+• Linphone'dan +905079... gibi gerçek bir numara aramak için cihazdaki
+  F50SipBridge uygulamasının (com.f50.sip) 'server' olarak register
+  olmuş olması lazım. Aksi halde sipserver 'User not found' döner —
+  çünkü SIP-kullanıcı olmayan hedef için kayıtlı bir handler yok.
+• /sip çıktısında 'F50SipBridge app' satırını kontrol et; çalışmıyorsa:
+  am start-foreground-service com.f50.sip/.SipForegroundService
+
 🔔 Otomatik (arka plan):
 • Yeni gelen SMS otomatik forward
 • Sıcaklık > %d°C, RAM < %%%d, tunnel düşmesi alarm

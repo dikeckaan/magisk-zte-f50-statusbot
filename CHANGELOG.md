@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.21.3 — 2026-05-20
+- **/help gains a SIP / VoIP section** — full `/sip {…}` command list,
+  client-setup cheat sheet (Linphone / Zoiper / MicroSIP / Acrobits),
+  and a "GSM call returns User not found" note explaining that dialing
+  a real phone number from SIP requires F50SipBridge to be registered
+  as the `server` slot. Mirrored in both `en.sh` and `tr.sh`.
+
 ## v2.21.2 — 2026-05-20
 - **`/sip qr <user>`** — Linphone / MicroSIP / Acrobits için
   taranabilir QR. Komut çağrıldığında bot inline keyboard çıkarır
