@@ -3736,7 +3736,7 @@ cmd_sip() {
     case "$sub" in
         ""|status)
             local pid up=""
-            pid=$(pgrep -f '/system/bin/sipserver|/data/adb/modules/sip-server' 2>/dev/null | head -1)
+            pid=$(pgrep -f '/system/bin/sipserver|/data/adb/modules/sip-server|/data/sip-server/sipserver' 2>/dev/null | head -1)
             if [ -n "$pid" ] && [ -d "/proc/$pid" ]; then
                 local stime now
                 stime=$(stat -c %Y "/proc/$pid" 2>/dev/null)
