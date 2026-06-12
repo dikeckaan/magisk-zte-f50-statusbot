@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.24.1 — 2026-06-13
+- **Fix `/help` (and any long reply) silently failing** — replies over Telegram's
+  4096-char limit were rejected with no message. New `tg_send_long` splits long
+  replies into <=3500-char chunks on line boundaries; the final dispatch uses it.
+- **Fix shadowed command aliases**: `/mem` (was eaten by the memory-status command
+  before reaching lite-mem) removed from `/lite` aliases; `/dns` removed from the
+  `/dns_watch` aliases (it was shadowed by the standalone `/dns`). `/lite` and
+  `/dns` now route correctly.
+
+
 ## v2.24.0 — 2026-06-13
 - **New `/lite` command** (aliases `/mem`, `/litemem`) — control the new
   `lite-mem` memory-relief module from Telegram:

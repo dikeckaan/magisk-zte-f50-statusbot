@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.24.0"
+BOT_VERSION="v2.24.1"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -93,6 +93,30 @@ tg_send() {
         -d "chat_id=$1" \
         --data-urlencode "text=$2" \
         $extra 2>/dev/null
+}
+
+# tg_send_long $chat $text [$reply_to] — Telegram caps a message at 4096 chars
+# (UTF-16 units); long replies (e.g. /help) silently fail. Split on line
+# boundaries into <=3500-char chunks (safe margin for emoji) and send each.
+tg_send_long() {
+    local chat="$1" text="$2" reply_to="$3" max=3500
+    if [ "${#text}" -le "$max" ]; then
+        tg_send "$chat" "$text" "$reply_to"
+        return
+    fi
+    local buf="" line first=1
+    while IFS= read -r line || [ -n "$line" ]; do
+        if [ -n "$buf" ] && [ $(( ${#buf} + ${#line} + 1 )) -gt "$max" ]; then
+            tg_send "$chat" "$buf" "$( [ "$first" = 1 ] && printf %s "$reply_to" )" >/dev/null
+            first=0; buf="$line"
+        else
+            buf="${buf:+$buf
+}$line"
+        fi
+    done <<EOF
+$text
+EOF
+    [ -n "$buf" ] && tg_send "$chat" "$buf" "$( [ "$first" = 1 ] && printf %s "$reply_to" )" >/dev/null
 }
 
 tg_send_with_cancel() {
@@ -4929,7 +4953,7 @@ dispatch() {
         /sms_cmd|/smscmd)              reply=$(cmd_sms_cmd "$args") ;;
         /region|/bolge|/bölge)         reply=$(cmd_region "$args") ;;
         /ssh|/anahtar)                 reply=$(cmd_ssh "$args") ;;
-        /lite|/mem|/litemem)           reply=$(cmd_lite "$args") ;;
+        /lite|/litemem)                reply=$(cmd_lite "$args") ;;
         /sip|/voip)
             local sub=$(first_word "$args" | tr '[:upper:]' '[:lower:]')
             if [ "$sub" = "qr" ]; then
@@ -4939,7 +4963,7 @@ dispatch() {
             fi
             reply=$(cmd_sip "$args") ;;
         /tor)                          reply=$(cmd_tor "$args") ;;
-        /dns_watch|/dnswatch|/dns)     reply=$(cmd_dns_watch "$args") ;;
+        /dns_watch|/dnswatch)          reply=$(cmd_dns_watch "$args") ;;
         /mitm)
             # /mitm ca needs to send a document — handle specially
             local sub=$(first_word "$args" | tr '[:upper:]' '[:lower:]')
@@ -5010,7 +5034,7 @@ dispatch() {
             return ;;
     esac
 
-    [ -n "$reply" ] && tg_send "$chat_id" "$reply" "$msg_id" >/dev/null
+    [ -n "$reply" ] && tg_send_long "$chat_id" "$reply" "$msg_id" >/dev/null
 }
 
 # ─── main ─────────────────────────────────────────────────────────────────
