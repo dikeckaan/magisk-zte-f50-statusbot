@@ -4879,7 +4879,7 @@ dispatch() {
         /modules|/moduller)            reply=$(cmd_modules) ;;
         /perf_balanced|/balanced|/perfbalanced)
             reply=$(cmd_perf_balanced "$args") ;;
-        /minimal_mode|/minimal|/lite)
+        /minimal_mode|/minimal)
             reply=$(cmd_minimal_mode "$args") ;;
         /perf_help|/perfhelp|/cpuhelp)
             reply=$(cmd_perf_help) ;;
