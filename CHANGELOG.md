@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.24.0 — 2026-06-13
+- **New `/lite` command** (aliases `/mem`, `/litemem`) — control the new
+  `lite-mem` memory-relief module from Telegram:
+  - `/lite` — memory status (swap, swappiness, RAM, web-panel, samba).
+  - `/lite webui off|on` — kill/restore the ZTE goform web panel (~25-30 MB).
+  - `/lite samba off|on` — stop/start the SMB share (smbd :139/:445).
+  - `/lite saver on|off` — one-shot RAM-saving mode.
+
+
 ## v2.23.0 — 2026-06-12
 - **New `/ssh` command** — manage dropbear-ssh authorized keys from Telegram.
   - `/ssh ssh-ed25519 AAAA… note` — add a public key (effective immediately,

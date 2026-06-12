@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.23.0"
+BOT_VERSION="v2.24.0"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -3719,6 +3719,28 @@ dropbear_autokey() {
     return 0
 }
 
+# ─── /lite — control the lite-mem memory-relief module ────────────────────
+LITE_MEM_CLI=/data/adb/modules/lite-mem/system/bin/lite-mem
+
+lite_mem_present() {
+    [ -f "$LITE_MEM_CLI" ] || [ -d /data/adb/modules/lite-mem ] || [ -d /data/adb/modules_update/lite-mem ]
+}
+
+cmd_lite() {
+    if ! lite_mem_present; then
+        say "${MSG[lite_not_installed]}"
+        return
+    fi
+    local sub=$(first_word "$1" | tr '[:upper:]' '[:lower:]')
+    case "$sub" in
+        ""|status|durum) sh "$LITE_MEM_CLI" status 2>/dev/null ;;
+        webui)           sh "$LITE_MEM_CLI" webui "$(nth_word 2 "$1")" 2>/dev/null ;;
+        samba)           sh "$LITE_MEM_CLI" samba "$(nth_word 2 "$1")" 2>/dev/null ;;
+        saver)           sh "$LITE_MEM_CLI" saver "$(nth_word 2 "$1")" 2>/dev/null ;;
+        *)               say "${MSG[lite_usage]}" ;;
+    esac
+}
+
 # ─── /ussd — disabled on this modem ───────────────────────────────────────
 # The UMS9620 modem's AT+CUSD only supports modes 0/1/2 (enable/disable/
 # cancel). Sending a USSD code through AT (e.g. AT+CUSD=1,"*123#",15)
@@ -4907,6 +4929,7 @@ dispatch() {
         /sms_cmd|/smscmd)              reply=$(cmd_sms_cmd "$args") ;;
         /region|/bolge|/bölge)         reply=$(cmd_region "$args") ;;
         /ssh|/anahtar)                 reply=$(cmd_ssh "$args") ;;
+        /lite|/mem|/litemem)           reply=$(cmd_lite "$args") ;;
         /sip|/voip)
             local sub=$(first_word "$args" | tr '[:upper:]' '[:lower:]')
             if [ "$sub" = "qr" ]; then

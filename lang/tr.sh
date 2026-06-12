@@ -57,6 +57,7 @@ Komutlar için /help"
 /wifi — Hotspot SSID + şifre + bağlı cihazlar
 /region [ÜK] — WiFi ülke/bölge (TR/US/CN…, list, off)
 /ssh <pubkey> — SSH anahtarı ekle (dropbear) / list / clear
+/lite [webui|samba|saver off/on] — bellek rahatlatma (lite-mem)
 /tunnel — Cloudflared durumu
 
 🔧 Sistem
@@ -546,6 +547,8 @@ Uygulanınca cihaz REBOOT olacak."
 
     # ─── /sms_cmd (sms-cmd modulu) ───────────────────────────────────
     [region_not_installed]="🌍 hotspot-region modulu kurulu degil. WiFi ulke/bolgesini degistirmek icin: /install_module hotspot-region. Kullanim: /region [TR|US|CN|… | list | off]"
+    [lite_not_installed]="🧠 lite-mem modulu kurulu degil. /install_module lite-mem (zram swap + bloat kapatma + web panel/samba durdurma ile RAM rahatlatir)."
+    [lite_usage]="Kullanim:\n  /lite                 — bellek durumu\n  /lite webui off|on    — ZTE web panelini kapat/ac (~25MB)\n  /lite samba off|on    — SMB paylasimini durdur/baslat (smbd :139/:445)\n  /lite saver on|off    — RAM tasarruf modu (web panel + samba)"
     [ssh_not_installed]="🔑 dropbear-ssh modulu kurulu degil. /install_module dropbear-ssh (key vermezsen otomatik uretilip buraya gonderilir)."
     [ssh_status_fmt]="🔑 Dropbear SSH\n  Calisiyor: %s\n  Port:      %s\n  Anahtar:   %s\n\nAnahtar ekle: /ssh ssh-ed25519 AAAA... not\nListele:      /ssh list\nBaglan:       ssh -p 22222 root@HOST"
     [ssh_added_fmt]="✅ SSH anahtari eklendi (%s). Hemen gecerli — baglan: ssh -p 22222 root@HOST"

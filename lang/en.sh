@@ -67,6 +67,7 @@ Type /help for commands."
 /wifi — hotspot SSID + password + clients
 /region [CC] — WiFi country/region (TR/US/CN…, list, off)
 /ssh <pubkey> — add SSH key (dropbear) / list / clear
+/lite [webui|samba|saver off/on] — memory relief (lite-mem)
 /tunnel — Cloudflared status
 
 🔧 System
@@ -559,6 +560,8 @@ On confirmation the device will REBOOT."
 
     # ─── /sms_cmd (sms-cmd module) ───────────────────────────────────
     [region_not_installed]="🌍 hotspot-region module is not installed. /install_module hotspot-region to control the WiFi country/region. Usage: /region [TR|US|CN|… | list | off]"
+    [lite_not_installed]="🧠 lite-mem module is not installed. /install_module lite-mem (zram swap + debloat + kill web panel/samba to relieve RAM)."
+    [lite_usage]="Usage:\n  /lite                 — memory status\n  /lite webui off|on    — kill/restore ZTE web panel (~25MB)\n  /lite samba off|on    — stop/start SMB share (smbd :139/:445)\n  /lite saver on|off    — RAM-saving mode (web panel + samba)"
     [ssh_not_installed]="🔑 dropbear-ssh module is not installed. /install_module dropbear-ssh (a client key is auto-generated and sent here if you don't provide one)."
     [ssh_status_fmt]="🔑 Dropbear SSH\n  Running: %s\n  Port:    %s\n  Keys:    %s\n\nAdd a key:  /ssh ssh-ed25519 AAAA... comment\nList keys:  /ssh list\nConnect:    ssh -p 22222 root@HOST"
     [ssh_added_fmt]="✅ SSH key added (%s). Effective immediately — connect: ssh -p 22222 root@HOST"
