@@ -638,6 +638,7 @@ Uygulanınca cihaz REBOOT olacak."
     # ─── /adguard (adguardhome modulu) ───────────────────────────────
     [agh_not_installed]="🛡 AdGuard Home modulu kurulu degil. github.com/dikeckaan/magisk-zte-f50-adguardhome adresinden indirip yukleyin."
     [agh_status_running_fmt]="🛡 AdGuard Home: 🟢 calisiyor\nPID: %s\nRAM: %d MB\nBugunku sorgu: %s\nBugun engellenen: %s\n"
+    [agh_conn_fmt]="🌐 Web UI: http://%s:%s\n📡 DNS:    %s:%s  (hotspot cihazlarinda DNS olarak ayarla)\n"
     [agh_status_stopped]="🛡 AdGuard Home: ⚪ durdu
 /adguard on ile baslatin"
     [agh_already_running]="🛡 Zaten calisiyor. Detay icin /adguard status."

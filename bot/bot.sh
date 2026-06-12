@@ -1136,6 +1136,22 @@ adguard_module_dir() {
     done
     return 1
 }
+
+# Print AdGuard Home connection info (Web UI + DNS ports). Ports are read from
+# AdGuardHome.yaml when present, else the module defaults (Web 3000 / DNS 5353).
+agh_conn_info() {
+    local data="$1"
+    local yaml="$data/AdGuardHome.yaml"
+    local web_port dns_port host_ip
+    if [ -r "$yaml" ]; then
+        web_port=$(awk '/^bind_port:/{print $2; exit}' "$yaml" 2>/dev/null)
+        dns_port=$(awk '/^[[:space:]]+port:/{print $2; exit}' "$yaml" 2>/dev/null)
+    fi
+    host_ip=$(ip -4 addr show br0 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1 | head -1)
+    [ -z "$host_ip" ] && host_ip=192.168.0.1
+    printf "${MSG[agh_conn_fmt]}" "$host_ip" "${web_port:-3000}" "$host_ip" "${dns_port:-5353}"
+}
+
 cmd_adguard() {
     local arg=$(first_word "$1" | tr '[:upper:]' '[:lower:]')
     if [ "$arg" = "install" ]; then
@@ -1176,8 +1192,10 @@ cmd_adguard() {
                     blocked_today=$(grep -c "\"Result\":{\"IsFiltered\":true" "$data/querylog.json" 2>/dev/null || echo 0)
                 fi
                 printf "${MSG[agh_status_running_fmt]}" "$pid" "$mem_mb" "$queries_today" "$blocked_today"
+                agh_conn_info "$data"
             else
                 say "${MSG[agh_status_stopped]}"
+                agh_conn_info "$data"
             fi
             ;;
         on|start)

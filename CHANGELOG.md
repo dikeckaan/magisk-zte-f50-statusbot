@@ -15,6 +15,9 @@
   optional Google Geolocation API key (`/locate key <KEY>`) for reliable
   coverage (BeaconDB is keyless but sparse, esp. in Turkey); clear hint shown
   when a lookup misses.
+- **`/adguard` now shows connection info** — Web UI URL + DNS server/port
+  (read from `AdGuardHome.yaml`, default Web 3000 / DNS 5353) so you can point
+  hotspot clients at it.
 - Folds in v2.22.0 (`/region`) and v2.22.1 (cloudflared false-alert fix).
 
 ## v2.22.1 — 2026-06-12

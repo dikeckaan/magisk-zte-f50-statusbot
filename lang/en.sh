@@ -651,6 +651,7 @@ On confirmation the device will REBOOT."
     # ─── /adguard (adguardhome module) ───────────────────────────────
     [agh_not_installed]="🛡 AdGuard Home module is not installed. Flash it from github.com/dikeckaan/magisk-zte-f50-adguardhome and reboot."
     [agh_status_running_fmt]="🛡 AdGuard Home: 🟢 running\nPID: %s\nRAM: %d MB\nQueries today: %s\nBlocked today: %s\n"
+    [agh_conn_fmt]="🌐 Web UI: http://%s:%s\n📡 DNS:    %s:%s  (set this as the DNS on hotspot clients)\n"
     [agh_status_stopped]="🛡 AdGuard Home: ⚪ stopped
 Start it with /adguard on"
     [agh_already_running]="🛡 Already running. Use /adguard status for details."
