@@ -17,7 +17,9 @@ Pure shell + curl + jq. ~50 KB module. No persistent network listeners; long-pol
 - `/traffic` — cumulative RX/TX since boot per interface
 - `/ping <host>`
 - `/clients` — ARP / neighbor table
-- `/tunnel` — Cloudflared tunnel status (if you use one)
+- `/tunnel` — Cloudflared tunnel status (only alerts/reports when the `cloudflared-tunnel` module is installed)
+- `/region [CC|list|off]` — WiFi regulatory region / country code via the `hotspot-region` module (default TR; runtime `cmd wifi force-country-code`, no file edits)
+- `/ssh [<public-key>|list|clear]` — manage `dropbear-ssh` authorized keys. Paste a public key to authorize it (effective immediately). On `/install_module dropbear-ssh` with no key provided, a client keypair is auto-generated and the private key is sent to you.
 
 ### 📡 Cellular (uses `sendat` from bin-utils — UFI-TOOLS not required)
 - `/signal` — RSSI / RSRP / RSRQ with labeled quality (🟢/🟡/🟠/🔴)

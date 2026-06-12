@@ -1,5 +1,39 @@
 # Changelog
 
+## v2.23.0 — 2026-06-12
+- **New `/ssh` command** — manage dropbear-ssh authorized keys from Telegram.
+  - `/ssh ssh-ed25519 AAAA… note` — add a public key (effective immediately,
+    dropbear reads authorized_keys per-connection; no restart).
+  - `/ssh` status, `/ssh list`, `/ssh clear`. Alias `/anahtar`.
+- **dropbear-ssh auto-key on install** — `/install_module dropbear-ssh` no longer
+  aborts when you provide no key: the bot extracts `dropbearkey` from the module
+  zip, generates an ed25519 client keypair, installs the public key, and sends
+  the private key to you as a Telegram document (Dropbear format; use with
+  `dbclient`, or `dropbearconvert` for OpenSSH).
+- **`/locate` accuracy fix + Google provider.** Fixed stale/"no cell data"
+  results (see cell-tools v1.0.1 — first-insert `last_seen` was null). Added an
+  optional Google Geolocation API key (`/locate key <KEY>`) for reliable
+  coverage (BeaconDB is keyless but sparse, esp. in Turkey); clear hint shown
+  when a lookup misses.
+- Folds in v2.22.0 (`/region`) and v2.22.1 (cloudflared false-alert fix).
+
+## v2.22.1 — 2026-06-12
+- **Fix false "Cloudflared tunnel is down" alert** when the `cloudflared-tunnel`
+  module isn't installed. The boot/periodic alert now fires only when cloudflared
+  is actually present (`cloudflared_present()` — binary or module dir).
+- `/tunnel` (`/cf`) now reports a clear "module not installed" message instead of
+  "not running" when cloudflared is absent.
+
+## v2.22.0 — 2026-06-12
+- **New `/region` command** — integrates the new `hotspot-region` module to
+  change the WiFi regulatory region (country code) at runtime.
+  - `/region` — show desired + live driver/softap country + supported channels
+  - `/region <CC>` — set region (e.g. `/region us`, default module region TR)
+  - `/region list` — common presets (TR/US/CN/DE/GB/JP/00)
+  - `/region off` — drop the override, revert to ro.boot default
+  - Falls back to a clear "module not installed" message when absent.
+  - Aliases: `/bolge`, `/bölge`. Help + en/tr strings added.
+
 ## v2.21.3 — 2026-05-20
 - **/help gains a SIP / VoIP section** — full `/sip {…}` command list,
   client-setup cheat sheet (Linphone / Zoiper / MicroSIP / Acrobits),

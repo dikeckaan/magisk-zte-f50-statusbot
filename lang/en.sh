@@ -65,6 +65,8 @@ Type /help for commands."
 /speedtest [cf|ookla|fast] [size] — speed test (default cf)
 /clients — connected clients (ARP)
 /wifi — hotspot SSID + password + clients
+/region [CC] — WiFi country/region (TR/US/CN…, list, off)
+/ssh <pubkey> — add SSH key (dropbear) / list / clear
 /tunnel — Cloudflared status
 
 🔧 System
@@ -544,6 +546,10 @@ On confirmation the device will REBOOT."
     [locate_no_data]="🌍 No cell data available (cell-tools needs to run first)."
     [locate_failed_fmt]="❌ Location lookup failed: %s"
     [locate_result_fmt]="🌍 Approximate location:\n  Latitude:  %s\n  Longitude: %s\n  Accuracy: ±%s m\n  https://maps.google.com/?q=%s,%s"
+    [locate_coverage_hint]="ℹ️ Using BeaconDB (free, keyless) — sparse coverage, esp. in Turkey. For reliable results add a Google Geolocation API key:\n  /locate key <YOUR_KEY>\n(get one at console.cloud.google.com → Geolocation API)"
+    [locate_key_set]="🔑 Google Geolocation key saved. /locate will now use Google (better coverage)."
+    [locate_key_cleared]="🗑 Geolocation key removed. /locate falls back to BeaconDB (keyless)."
+    [locate_key_usage]="Usage:\n  /locate key <KEY>   — set Google Geolocation API key\n  /locate key clear   — remove it (back to BeaconDB)"
     [ussd_unsupported]="📞 USSD is not available on this device.\n\nThe Unisoc UMS9620 modem's AT command surface allows AT+CUSD only in enable/disable/cancel modes — sending an actual USSD code returns CME ERROR 3 (Operation not allowed). No alternative path exists on this firmware:\n  • cmd phone send-ussd-request — not implemented in this Android build\n  • Dialer Activity intent — works but the F50 is headless, so the reply UI is invisible\n\nWorkarounds: dial the USSD code from a phone using this F50's SIM (if reachable), or via the operator's web/app self-service portal.\n\n(Command kept in /help so future hardware/firmware updates can re-enable it.)"
     [ussd_usage]="(unused — see ussd_unsupported)"
     [ussd_request_fmt]="(unused)"
@@ -552,6 +558,19 @@ On confirmation the device will REBOOT."
     [ussd_failed_fmt]="(unused)"
 
     # ─── /sms_cmd (sms-cmd module) ───────────────────────────────────
+    [region_not_installed]="🌍 hotspot-region module is not installed. /install_module hotspot-region to control the WiFi country/region. Usage: /region [TR|US|CN|… | list | off]"
+    [ssh_not_installed]="🔑 dropbear-ssh module is not installed. /install_module dropbear-ssh (a client key is auto-generated and sent here if you don't provide one)."
+    [ssh_status_fmt]="🔑 Dropbear SSH\n  Running: %s\n  Port:    %s\n  Keys:    %s\n\nAdd a key:  /ssh ssh-ed25519 AAAA... comment\nList keys:  /ssh list\nConnect:    ssh -p 22222 root@HOST"
+    [ssh_added_fmt]="✅ SSH key added (%s). Effective immediately — connect: ssh -p 22222 root@HOST"
+    [ssh_key_dup]="ℹ️ That key is already authorized."
+    [ssh_no_keys]="🔑 No SSH keys authorized yet. Add one: /ssh <public-key>"
+    [ssh_list_header]="🔑 Authorized SSH keys:"
+    [ssh_cleared]="🗑 All SSH keys removed. Dropbear will refuse logins until you add one."
+    [ssh_usage]="Usage:\n  /ssh                          — status\n  /ssh ssh-ed25519 AAAA... note — add a public key\n  /ssh list                     — list authorized keys\n  /ssh clear                    — remove all keys"
+    [ssh_autokey_generating]="🔑 No SSH key provided — generating a client keypair on the device..."
+    [ssh_autokey_failed]="⚠️ Auto key generation failed; install may abort. Provide a key with /ssh or push one to /sdcard/authorized_keys."
+    [ssh_autokey_sent]="🔑 Generated client private key sent above. It is in Dropbear format — use it with dbclient:\n  dbclient -i <saved-key> -p 22222 root@HOST\n(For OpenSSH 'ssh', convert with: dropbearconvert dropbear openssh <key> id_ed25519)"
+    [ssh_autokey_caption]="F50 SSH client private key (Dropbear format). Keep it secret. dbclient -i thisfile -p 22222 root@HOST"
     [smscmd_not_installed]="📱 sms-cmd module is not installed. /install_module sms-cmd to add the offline SMS backup channel."
     [smscmd_no_config]="📱 sms-cmd config missing — daemon hasn't seeded /data/sms-cmd/config.json yet."
     [smscmd_status_fmt]="📱 SMS Command Channel\n  Secret set:        %s\n  Whitelist entries: %s\n  Allowed cmds:      %s\n  Events logged:     %s"
@@ -724,6 +743,7 @@ $ %s
     [ip_local_header]="🏠 Local interfaces:"
     [modules_header]="🧩 Magisk Modules:"
     [tunnel_off]="❌ Cloudflared not running"
+    [tunnel_not_installed]="🔌 cloudflared-tunnel module is not installed. /install_module cloudflared-tunnel to add a Cloudflare tunnel."
     [clients_header]="📶 ARP/Neighbor table:"
     [clients_none]="  (no active record)"
 

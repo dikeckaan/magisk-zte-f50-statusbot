@@ -1,7 +1,7 @@
 #!/system/bin/bash
 # Telegram status bot — multi-language UI (lang/<code>.sh files in module dir)
 
-BOT_VERSION="v2.21.3"
+BOT_VERSION="v2.23.0"
 MODDIR=/data/adb/modules/statusbot
 DATADIR=/data/statusbot
 TASK_DIR="$DATADIR/tasks"
@@ -970,11 +970,32 @@ install_module_from_url() {
         return 6
     fi
 
+    # dropbear-ssh: if the user provided no SSH key, auto-generate a client
+    # keypair (so customize.sh doesn't abort) and remember to send the private
+    # key after a successful install.
+    local autokey_priv=""
+    if [ "$mod_id" = "dropbear-ssh" ] \
+       && [ ! -s /data/ssh/authorized_keys ] \
+       && [ ! -s /sdcard/authorized_keys ] \
+       && [ ! -s /sdcard/Download/authorized_keys ] \
+       && [ ! -s /data/local/tmp/authorized_keys ]; then
+        say "${MSG[ssh_autokey_generating]}"
+        if dropbear_autokey "$tmp_zip"; then
+            autokey_priv=/data/ssh/client_id_dropbear
+        else
+            say "${MSG[ssh_autokey_failed]}"
+        fi
+    fi
+
     tf install_installing_fmt "$mod_id"
     install_out=$(magisk --install-module "$tmp_zip" 2>&1)
     rm -f "$tmp_zip"
     if echo "$install_out" | grep -q "Done"; then
         tf install_success_fmt "$mod_id" "$remote_ver"
+        if [ -n "$autokey_priv" ] && [ -s "$autokey_priv" ]; then
+            tg_send_document "$OWNER" "$autokey_priv" "$(t ssh_autokey_caption)" >/dev/null 2>&1
+            say "${MSG[ssh_autokey_sent]}"
+        fi
         return 0
     else
         tf install_failed_fmt "$mod_id" "$(echo "$install_out" | tail -3)"
@@ -3071,18 +3092,45 @@ cmd_imsi_watch() {
     esac
 }
 
+GEO_KEY_FILE=/data/cell-tools/geo_api_key
+
 cmd_locate() {
     if ! cell_tools_present; then
         say "${MSG[cell_not_installed]}"
         return
     fi
+
+    # /locate key <KEY> | /locate key clear — manage the optional Google
+    # Geolocation API key. BeaconDB is keyless but has sparse coverage
+    # (especially in Turkey); Google covers far more towers.
+    local sub
+    sub=$(first_word "$1" | tr '[:upper:]' '[:lower:]')
+    if [ "$sub" = "key" ]; then
+        local kv
+        kv=$(nth_word 2 "$1")
+        if [ "$kv" = "clear" ] || [ "$kv" = "remove" ]; then
+            rm -f "$GEO_KEY_FILE"
+            say "${MSG[locate_key_cleared]}"
+        elif [ -n "$kv" ]; then
+            printf '%s' "$kv" > "$GEO_KEY_FILE"
+            chmod 600 "$GEO_KEY_FILE"
+            say "${MSG[locate_key_set]}"
+        else
+            say "${MSG[locate_key_usage]}"
+        fi
+        return
+    fi
+
     if [ ! -r "$CELL_DB" ]; then
         say "${MSG[cell_db_empty]}"
         return
     fi
     # Pull the most recently seen cell as the geolocation seed.
     local rec
-    rec=$("$JQ" -r 'to_entries | sort_by(-.value.last_seen) | .[0].value' "$CELL_DB" 2>/dev/null)
+    # null-safe sort: a freshly-inserted cell may have a null last_seen
+    # (legacy DB rows) — fall back to first_seen/ts/0 so the newest serving
+    # cell is still chosen and jq never errors on -(null).
+    rec=$("$JQ" -r 'to_entries | sort_by(-(.value.last_seen // .value.first_seen // .value.ts // 0)) | .[0].value' "$CELL_DB" 2>/dev/null)
     if [ -z "$rec" ] || [ "$rec" = "null" ]; then
         say "${MSG[locate_no_data]}"
         return
@@ -3097,7 +3145,7 @@ cmd_locate() {
 
     tf locate_request_fmt "$mcc" "$mnc" "$cellid"
 
-    # Mozilla Location Service — anonymous endpoint, no key.
+    # Geolocation request body (Google + BeaconDB share this schema).
     local body
     body=$("$JQ" -nc \
         --argjson mcc "$mcc" --argjson mnc "$mnc" \
@@ -3105,13 +3153,25 @@ cmd_locate() {
         --argjson rsrp "$rsrp_dbm" \
         '{cellTowers:[{radioType:"lte", mobileCountryCode:$mcc, mobileNetworkCode:$mnc, cellId:$cid, locationAreaCode:$tac, signalStrength:$rsrp}], considerIp:false}')
 
-    # Mozilla Location Service shut down in Sep 2024. BeaconDB is the
-    # community-maintained successor — same JSON schema, anonymous.
-    local resp
-    resp=$("$CURL" -sS --cacert "$CA" --max-time 15 \
-        -H "Content-Type: application/json" \
-        --data "$body" \
-        "https://api.beacondb.net/v1/geolocate" 2>/dev/null)
+    # Provider selection:
+    #   - Google Geolocation API if a key is configured (best coverage, incl. TR)
+    #   - else BeaconDB (keyless community successor to Mozilla MLS, sparse)
+    local resp provider
+    if [ -s "$GEO_KEY_FILE" ]; then
+        local gkey
+        gkey=$(cat "$GEO_KEY_FILE" 2>/dev/null | tr -d ' \r\n')
+        provider="google"
+        resp=$("$CURL" -sS --cacert "$CA" --max-time 15 \
+            -H "Content-Type: application/json" \
+            --data "$body" \
+            "https://www.googleapis.com/geolocation/v1/geolocate?key=${gkey}" 2>/dev/null)
+    else
+        provider="beacondb"
+        resp=$("$CURL" -sS --cacert "$CA" --max-time 15 \
+            -H "Content-Type: application/json" \
+            --data "$body" \
+            "https://api.beacondb.net/v1/geolocate" 2>/dev/null)
+    fi
 
     local lat lng acc
     lat=$(echo "$resp" | "$JQ" -r '.location.lat // empty' 2>/dev/null)
@@ -3120,8 +3180,10 @@ cmd_locate() {
 
     if [ -z "$lat" ] || [ -z "$lng" ]; then
         local err
-        err=$(echo "$resp" | "$JQ" -r '.error.message // .' 2>/dev/null | head -c 200)
+        err=$(echo "$resp" | "$JQ" -r '.error.message // .error // .' 2>/dev/null | head -c 200)
         tf locate_failed_fmt "$err"
+        # Keyless DB has poor coverage in many regions — hint at the Google key.
+        [ "$provider" = "beacondb" ] && say "${MSG[locate_coverage_hint]}"
         return
     fi
     tf locate_result_fmt "$lat" "$lng" "${acc:-?}" "$lat" "$lng"
@@ -3527,6 +3589,118 @@ cmd_sms_cmd() {
     esac
 }
 
+# ─── /region — WiFi regulatory region via hotspot-region module ──────────
+HOTSPOT_REGION_CLI=/data/adb/modules/hotspot-region/region.sh
+
+hotspot_region_present() {
+    [ -d /data/adb/modules/hotspot-region ] || [ -d /data/adb/modules_update/hotspot-region ]
+}
+
+cmd_region() {
+    if ! hotspot_region_present; then
+        say "${MSG[region_not_installed]}"
+        return
+    fi
+    local sub=$(first_word "$1" | tr '[:upper:]' '[:lower:]')
+    case "$sub" in
+        ""|status|durum)
+            sh "$HOTSPOT_REGION_CLI" status 2>/dev/null
+            ;;
+        list|liste)
+            sh "$HOTSPOT_REGION_CLI" list 2>/dev/null
+            ;;
+        off|reset|disable|disabled|kapat)
+            sh "$HOTSPOT_REGION_CLI" reset 2>/dev/null
+            ;;
+        *)
+            # Anything else is treated as a country code (e.g. /region us).
+            sh "$HOTSPOT_REGION_CLI" set "$(first_word "$1")" 2>/dev/null
+            ;;
+    esac
+}
+
+# ─── /ssh — manage dropbear-ssh authorized keys ──────────────────────────
+SSH_DATADIR=/data/ssh
+SSH_AUTH_KEYS="$SSH_DATADIR/authorized_keys"
+
+dropbear_present() {
+    [ -d /data/adb/modules/dropbear-ssh ] || [ -d /data/adb/modules_update/dropbear-ssh ]
+}
+
+# Write a public key into authorized_keys (dedupe by key body). Dropbear reads
+# the file per-connection, so a new key is effective immediately — no restart.
+ssh_add_key() {
+    local key="$1" body
+    body=$(echo "$key" | awk '{print $2}')
+    mkdir -p "$SSH_DATADIR"
+    if [ -s "$SSH_AUTH_KEYS" ] && [ -n "$body" ] && grep -qF "$body" "$SSH_AUTH_KEYS" 2>/dev/null; then
+        return 2   # duplicate
+    fi
+    printf '%s\n' "$key" >> "$SSH_AUTH_KEYS"
+    chmod 600 "$SSH_AUTH_KEYS"
+    chown 2000:2000 "$SSH_AUTH_KEYS" 2>/dev/null
+    return 0
+}
+
+cmd_ssh() {
+    if ! dropbear_present; then
+        say "${MSG[ssh_not_installed]}"
+        return
+    fi
+    local arg="$1"
+    case "$arg" in
+        ssh-ed25519\ *|ssh-rsa\ *|ssh-dss\ *|ecdsa-sha2-*\ *)
+            ssh_add_key "$arg"
+            case $? in
+                0) tf ssh_added_fmt "$(echo "$arg" | awk '{print $1}')" ;;
+                2) say "${MSG[ssh_key_dup]}" ;;
+            esac
+            ;;
+        ""|status|durum)
+            local n=0 running
+            [ -r "$SSH_AUTH_KEYS" ] && n=$(grep -cE '^(ssh-|ecdsa-)' "$SSH_AUTH_KEYS" 2>/dev/null)
+            if pgrep -x dropbear >/dev/null 2>&1; then running="✅"; else running="❌"; fi
+            tf ssh_status_fmt "$running" "22222" "$n"
+            ;;
+        list|liste)
+            if [ ! -s "$SSH_AUTH_KEYS" ]; then say "${MSG[ssh_no_keys]}"; return; fi
+            say "${MSG[ssh_list_header]}"
+            awk '/^(ssh-|ecdsa-)/{c=$3;for(i=4;i<=NF;i++)c=c" "$i;print "  • "$1" "(c==""?"(no comment)":c)}' "$SSH_AUTH_KEYS"
+            ;;
+        clear|sil|temizle)
+            : > "$SSH_AUTH_KEYS"
+            chmod 600 "$SSH_AUTH_KEYS" 2>/dev/null
+            chown 2000:2000 "$SSH_AUTH_KEYS" 2>/dev/null
+            say "${MSG[ssh_cleared]}"
+            ;;
+        *)
+            say "${MSG[ssh_usage]}"
+            ;;
+    esac
+}
+
+# dropbear-ssh auto-key: when installing dropbear-ssh and the user provided no
+# authorized_keys, extract dropbearkey from the module zip, generate a client
+# keypair, install the OpenSSH public key, and (caller) send the private key.
+# Echoes the generated private-key path on success; empty on failure.
+dropbear_autokey() {
+    local zip="$1"
+    local bb=/data/adb/modules/bin-utils/system/bin/busybox
+    local work=/data/local/tmp/.dbk
+    local privkey="$SSH_DATADIR/client_id_dropbear"
+    rm -rf "$work"; mkdir -p "$work" "$SSH_DATADIR"
+    "$bb" unzip -o "$zip" system/bin/dropbearkey -d "$work" >/dev/null 2>&1 || return 1
+    local dbk="$work/system/bin/dropbearkey"
+    chmod 0755 "$dbk" 2>/dev/null
+    [ -x "$dbk" ] || return 1
+    rm -f "$privkey"
+    "$dbk" -t ed25519 -f "$privkey" >/dev/null 2>&1 || return 1
+    "$dbk" -y -f "$privkey" 2>/dev/null | grep -E '^ssh-' > /data/local/tmp/authorized_keys
+    rm -rf "$work"
+    [ -s /data/local/tmp/authorized_keys ] || return 1
+    return 0
+}
+
 # ─── /ussd — disabled on this modem ───────────────────────────────────────
 # The UMS9620 modem's AT+CUSD only supports modes 0/1/2 (enable/disable/
 # cancel). Sending a USSD code through AT (e.g. AT+CUSD=1,"*123#",15)
@@ -3922,7 +4096,18 @@ cmd_modules() {
     done
 }
 
+# cloudflared-tunnel module installed? (binary or module dir present)
+cloudflared_present() {
+    [ -x /system/bin/cloudflared ] \
+        || [ -d /data/adb/modules/cloudflared-tunnel ] \
+        || [ -d /data/adb/modules_update/cloudflared-tunnel ]
+}
+
 cmd_tunnel() {
+    if ! cloudflared_present; then
+        say "${MSG[tunnel_not_installed]}"
+        return
+    fi
     if pgrep -f /system/bin/cloudflared >/dev/null 2>&1; then
         pid=$(pgrep -f /system/bin/cloudflared | head -1)
         if [ -n "$pid" ] && [ -d "/proc/$pid" ]; then
@@ -4455,8 +4640,8 @@ poll_auto_alerts() {
         fi
     fi
 
-    # Cloudflared tunnel down
-    if ! pgrep -f /system/bin/cloudflared >/dev/null 2>&1; then
+    # Cloudflared tunnel down — only alert if the module is actually installed
+    if cloudflared_present && ! pgrep -f /system/bin/cloudflared >/dev/null 2>&1; then
         if ! alert_fired_recently "tunnel_down"; then
             tg_send "$OWNER" "${MSG[alert_tunnel]}" >/dev/null
             alert_mark "tunnel_down"
@@ -4699,9 +4884,11 @@ dispatch() {
         /adguard|/agh|/adblock)        reply=$(cmd_adguard "$args") ;;
         /spectrum|/cells)              reply=$(cmd_spectrum) ;;
         /imsi_watch|/imsiwatch|/imsi)  reply=$(cmd_imsi_watch "$args") ;;
-        /locate|/where|/konum)         reply=$(cmd_locate) ;;
+        /locate|/where|/konum)         reply=$(cmd_locate "$args") ;;
         /ussd|/shortcode)              reply=$(cmd_ussd "$args") ;;
         /sms_cmd|/smscmd)              reply=$(cmd_sms_cmd "$args") ;;
+        /region|/bolge|/bölge)         reply=$(cmd_region "$args") ;;
+        /ssh|/anahtar)                 reply=$(cmd_ssh "$args") ;;
         /sip|/voip)
             local sub=$(first_word "$args" | tr '[:upper:]' '[:lower:]')
             if [ "$sub" = "qr" ]; then

@@ -55,6 +55,8 @@ Komutlar için /help"
 /speedtest [cf|ookla|fast] [size] — speedtest (default cf, /speedtest help)
 /clients — Bağlı cihazlar (ARP)
 /wifi — Hotspot SSID + şifre + bağlı cihazlar
+/region [ÜK] — WiFi ülke/bölge (TR/US/CN…, list, off)
+/ssh <pubkey> — SSH anahtarı ekle (dropbear) / list / clear
 /tunnel — Cloudflared durumu
 
 🔧 Sistem
@@ -531,6 +533,10 @@ Uygulanınca cihaz REBOOT olacak."
     [locate_no_data]="🌍 Cell verisi yok (cell-tools onceden calismali)."
     [locate_failed_fmt]="❌ Konum sorgulama basarisiz: %s"
     [locate_result_fmt]="🌍 Yaklasik konum:\n  Enlem:  %s\n  Boylam: %s\n  Hassasiyet: ±%s m\n  https://maps.google.com/?q=%s,%s"
+    [locate_coverage_hint]="ℹ️ BeaconDB kullaniliyor (ucretsiz, anahtarsiz) — kapsama zayif, ozellikle Turkiye'de. Guvenilir sonuc icin Google Geolocation API anahtari ekle:\n  /locate key <ANAHTAR>\n(console.cloud.google.com → Geolocation API)"
+    [locate_key_set]="🔑 Google Geolocation anahtari kaydedildi. /locate artik Google kullanacak (daha iyi kapsama)."
+    [locate_key_cleared]="🗑 Geolocation anahtari silindi. /locate tekrar BeaconDB'ye (anahtarsiz) dusecek."
+    [locate_key_usage]="Kullanim:\n  /locate key <ANAHTAR>  — Google Geolocation API anahtari ekle\n  /locate key clear      — sil (BeaconDB'ye don)"
     [ussd_unsupported]="📞 USSD bu cihazda kullanilamiyor.\n\nUnisoc UMS9620 modem'inin AT yuzeyi AT+CUSD'yi sadece enable/disable/cancel modunda destekliyor — gercek USSD kod gondermek CME ERROR 3 (Operation not allowed) donduruyor. Bu firmware'de alternatif yol yok:\n  • cmd phone send-ussd-request — bu Android sürumünde yok\n  • Dialer Activity intent — calisir ama F50 headless, UI gorulemez\n\nGecici cozumler: F50'nin SIM'iyle USSD kodu telefondan cevir (ulasilabilirse), veya operatorun web/app self-service'inden.\n\n(Komut /help'te birakildi — gelecek firmware guncellemesi USSD'yi acabilir.)"
     [ussd_usage]="(kullanilmiyor)"
     [ussd_request_fmt]="(kullanilmiyor)"
@@ -539,6 +545,19 @@ Uygulanınca cihaz REBOOT olacak."
     [ussd_failed_fmt]="(kullanilmiyor)"
 
     # ─── /sms_cmd (sms-cmd modulu) ───────────────────────────────────
+    [region_not_installed]="🌍 hotspot-region modulu kurulu degil. WiFi ulke/bolgesini degistirmek icin: /install_module hotspot-region. Kullanim: /region [TR|US|CN|… | list | off]"
+    [ssh_not_installed]="🔑 dropbear-ssh modulu kurulu degil. /install_module dropbear-ssh (key vermezsen otomatik uretilip buraya gonderilir)."
+    [ssh_status_fmt]="🔑 Dropbear SSH\n  Calisiyor: %s\n  Port:      %s\n  Anahtar:   %s\n\nAnahtar ekle: /ssh ssh-ed25519 AAAA... not\nListele:      /ssh list\nBaglan:       ssh -p 22222 root@HOST"
+    [ssh_added_fmt]="✅ SSH anahtari eklendi (%s). Hemen gecerli — baglan: ssh -p 22222 root@HOST"
+    [ssh_key_dup]="ℹ️ Bu anahtar zaten ekli."
+    [ssh_no_keys]="🔑 Henuz ekli SSH anahtari yok. Ekle: /ssh <public-key>"
+    [ssh_list_header]="🔑 Yetkili SSH anahtarlari:"
+    [ssh_cleared]="🗑 Tum SSH anahtarlari silindi. Dropbear yeni anahtar eklenene kadar giris kabul etmez."
+    [ssh_usage]="Kullanim:\n  /ssh                          — durum\n  /ssh ssh-ed25519 AAAA... not  — public key ekle\n  /ssh list                     — anahtarlari listele\n  /ssh clear                    — hepsini sil"
+    [ssh_autokey_generating]="🔑 SSH anahtari verilmedi — cihazda bir istemci anahtar cifti uretiliyor..."
+    [ssh_autokey_failed]="⚠️ Otomatik anahtar uretimi basarisiz; kurulum durabilir. /ssh ile ya da /sdcard/authorized_keys'e koyarak anahtar ver."
+    [ssh_autokey_sent]="🔑 Uretilen istemci private key yukarida gonderildi. Dropbear formatinda — dbclient ile kullan:\n  dbclient -i <kaydedilen-key> -p 22222 root@HOST\n(OpenSSH 'ssh' icin: dropbearconvert dropbear openssh <key> id_ed25519)"
+    [ssh_autokey_caption]="F50 SSH istemci private key (Dropbear formati). Gizli tut. dbclient -i budosya -p 22222 root@HOST"
     [smscmd_not_installed]="📱 sms-cmd modulu kurulu degil. Eklemek icin: /install_module sms-cmd"
     [smscmd_no_config]="📱 sms-cmd config'i bulunamadi — daemon henuz /data/sms-cmd/config.json'u olusturmamis."
     [smscmd_status_fmt]="📱 SMS Komut Kanali\n  Secret ayarli:  %s\n  Whitelist:      %s adet\n  Izinli komutlar: %s\n  Loglanan olay:  %s"
@@ -711,6 +730,7 @@ $ %s
     [ip_local_header]="🏠 Local arayüzler:"
     [modules_header]="🧩 Magisk Modülleri:"
     [tunnel_off]="❌ Cloudflared kapalı"
+    [tunnel_not_installed]="🔌 cloudflared-tunnel modulu kurulu degil. Eklemek icin: /install_module cloudflared-tunnel"
     [clients_header]="📶 ARP/Komşu Tablosu:"
     [clients_none]="  (aktif kayıt yok)"
 
